@@ -12,14 +12,40 @@
 #CC = cc
 CC = gcc -ansi
 
-# You may need to set directories to pick up the ncurses library.
-#INCLUDEDIRS = -I/usr/5include
-#LIBDIRS = -L/usr/5lib 
-LIBS = -lncurses
+# Do you want sound support using SDL2_mixer?
+SOUND = yes
 
 OPTIONS = -O
 
-CFLAGS = $(OPTIONS) $(INCLUDEDIRS)
+PKG_CONFIG=$(shell which pkg-config)
+ifeq (, $(PKG_CONFIG))
+  $(warning *** pkg-config not found. Using defaults.)
+
+  # You may need to set directories to pick up libraries.
+  #NCURSES_CFLAGS = -I/usr/5include
+  #NCURSES_LIBDIRS = -L/usr/5lib
+  NCURSES_LIBS = -lncurses
+
+  ifeq ($(SOUND), yes)
+    #SDL_CFLAGS = -I/usr/include/SDL2
+    #SDL_LIBDIRS = -L/usr/lib/SDL2
+    SDL_LIBS = -lSDL2 -lSDL2_mixer
+  endif
+else
+  NCURSES_CFLAGS = $(shell pkg-config --cflags ncurses)
+  NCURSES_LIBDIRS = $(shell pkg-config --libs-only-L ncurses)
+  NCURSES_LIBS = $(shell pkg-config --libs-only-l --libs-only-other ncurses)
+
+  ifeq ($(SOUND), yes)
+    SDL_CFLAGS = $(shell pkg-config --cflags sdl2 sdl2_mixer)
+    SDL_LIBDIRS = $(shell pkg-config --libs-only-L sdl2 sdl2_mixer)
+    SDL_LIBS = $(shell pkg-config --libs-only-l --libs-only-other sdl2 sdl2_mixer)
+  endif
+endif
+
+CFLAGS = $(OPTIONS) $(NCURSES_CFLAGS) $(SDL_CFLAGS)
+LIBDIRS = $(NCURSES_LIBDIRS) $(SDL_LIBDIRS)
+LIBS = $(NCURSES_LIBS) $(SDL_LIBS)
 
 GLKLIB = libglkterm.a
 

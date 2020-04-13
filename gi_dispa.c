@@ -1,4 +1,4 @@
-/* gi_dispa.c: Dispatch layer for Glk API, version 0.7.4.
+/* gi_dispa.c: Dispatch layer for Glk API, version 0.7.5.
     Designed by Andrew Plotkin <erkyrath@eblong.com>
     http://eblong.com/zarf/glk/
 
@@ -66,7 +66,11 @@ static gidispatch_intconst_t intconstant_table[] = {
     { "gestalt_CharOutput_ExactPrint", (2) },
     { "gestalt_DateTime", (20) },
     { "gestalt_DrawImage", (7) },
+#ifdef GLK_MODULE_GARGLKTEXT
+    { "gestalt_GarglkText", (0x1100) },
+#endif /* GLK_MODULE_GARGLKTEXT */
     { "gestalt_Graphics", (6) },
+    { "gestalt_GraphicsCharInput", (23) },
     { "gestalt_GraphicsTransparency", (14) },
     { "gestalt_HyperlinkInput", (12) },
     { "gestalt_Hyperlinks", (11) },
@@ -316,6 +320,12 @@ static gidispatch_function_t function_table[] = {
     { 0x0049, glk_stream_open_resource, "stream_open_resource" },
     { 0x013A, glk_stream_open_resource_uni, "stream_open_resource_uni" },
 #endif /* GLK_MODULE_RESOURCE_STREAM */
+#ifdef GLK_MODULE_GARGLKTEXT
+    { 0x1100, garglk_set_zcolors, "garglk_set_zcolors" },
+    { 0x1101, garglk_set_zcolors_stream, "garglk_set_zcolors_stream" },
+    { 0x1102, garglk_set_reversevideo, "garglk_set_reversevideo" },
+    { 0x1103, garglk_set_reversevideo_stream, "garglk_set_reversevideo_stream" },
+#endif /* GLK_MODULE_GARGLKTEXT */
 };
 
 glui32 gidispatch_count_classes()
@@ -325,7 +335,7 @@ glui32 gidispatch_count_classes()
 
 gidispatch_intconst_t *gidispatch_get_class(glui32 index)
 {
-    if (index < 0 || index >= NUMCLASSES)
+    if (index >= NUMCLASSES)
         return NULL;
     return &(class_table[index]);
 }
@@ -337,7 +347,7 @@ glui32 gidispatch_count_intconst()
 
 gidispatch_intconst_t *gidispatch_get_intconst(glui32 index)
 {
-    if (index < 0 || index >= NUMINTCONSTANTS)
+    if (index >= NUMINTCONSTANTS)
         return NULL;
     return &(intconstant_table[index]);
 }
@@ -349,7 +359,7 @@ glui32 gidispatch_count_functions()
 
 gidispatch_function_t *gidispatch_get_function(glui32 index)
 {
-    if (index < 0 || index >= NUMFUNCTIONS)
+    if (index >= NUMFUNCTIONS)
         return NULL;
     return &(function_table[index]);
 }
@@ -660,6 +670,21 @@ char *gidispatch_prototype(glui32 funcnum)
         case 0x013A: /* stream_open_resource_uni */
             return "3IuIu:Qb";
 #endif /* GLK_MODULE_RESOURCE_STREAM */
+
+#ifdef GLK_EXTEND_PROTOTYPE
+        GLK_EXTEND_PROTOTYPE
+#endif /* GLK_EXTEND_PROTOTYPE */
+
+#ifdef GLK_MODULE_GARGLKTEXT
+        case 0x1100: /* garglk_set_zcolors */
+            return "2IuIu:";
+        case 0x1101: /* garglk_set_zcolors_stream */
+            return "3QbIuIu:";
+        case 0x1102: /* garglk_set_reversevideo */
+            return "1Iu:";
+        case 0x1103: /* garglk_set_reversevideo_stream */
+            return "2QbIu:";
+#endif /* GLK_MODULE_GARGLKTEXT */
 
         default:
             return NULL;
@@ -1488,9 +1513,59 @@ void gidispatch_call(glui32 funcnum, glui32 numargs, gluniversal_t *arglist)
             break;
 #endif /* GLK_MODULE_RESOURCE_STREAM */
 
+#ifdef GLK_EXTEND_CALL
+        GLK_EXTEND_CALL
+#endif /* GLK_EXTEND_CALL */
+
+#ifdef GLK_MODULE_GARGLKTEXT
+        case 0x1100: /* garglk_set_zcolors */
+            garglk_set_zcolors( arglist[0].uint, arglist[1].uint );
+            break;
+        case 0x1101: /* garglk_set_zcolors_stream */
+            garglk_set_zcolors_stream( arglist[0].opaqueref, arglist[1].uint, arglist[2].uint );
+            break;
+        case 0x1102: /* garglk_set_reversevideo */
+            garglk_set_reversevideo( arglist[0].uint );
+            break;
+        case 0x1103: /* garglk_set_reversevideo_stream */
+            garglk_set_reversevideo_stream( arglist[0].opaqueref, arglist[1].uint );
+            break;
+#endif /* GLK_MODULE_GARGLKTEXT */
+
         default:
             /* do nothing */
             break;
     }
 }
 
+#ifdef GI_DISPA_GAME_ID_AVAILABLE
+
+static char *(*game_id_hook)(void) = NULL;
+
+/* Set a function for getting a game ID string. The Glk library may
+   call the supplied function when creating files, so that the files
+   can be put in a game-specific location.
+
+   The function must have the form: char *func(void);
+
+   It should return NULL or a pointer to a (null-terminated) string.
+   (The string will be copied, so it may be in a temporary buffer.)
+*/
+void gidispatch_set_game_id_hook(char *(*hook)(void))
+{
+    game_id_hook = hook;
+}
+
+/* Retrieve a game ID string for the current game. 
+
+   If not NULL, this string may be in a temporary buffer, so the caller
+   must copy it!
+*/
+char *gidispatch_get_game_id(void)
+{
+    if (!game_id_hook)
+        return NULL;
+    return game_id_hook();
+}
+
+#endif /* GI_DISPA_GAME_ID_AVAILABLE */

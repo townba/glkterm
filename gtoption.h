@@ -16,7 +16,7 @@
 
 /* Options: */
 
-#define LIBRARY_VERSION "1.0.4"
+#define LIBRARY_VERSION "1.0.5"
 #define LIBRARY_PORT "Generic"
 
 /* If you change this code substantially, you should change the
@@ -72,7 +72,8 @@
     is defined, GlkTerm will call signal() to set a handler for
     SIGWINCH, and rearrange the screen properly when the window
     is resized. If this is not defined, GlkTerm will think that
-    the window size is fixed, and not watch for changes.
+    the window size is fixed, and not watch for changes. (ncurses
+       handles SIGWINCH signals itself and sends KEY_RESIZE events.)
    This should generally be defined; comment it out only if your
     OS does not define SIGWINCH.
    OPT_WINCHANGED_SIGNAL will be ignored unless OPT_USE_SIGNALS

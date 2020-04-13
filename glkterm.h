@@ -7,7 +7,9 @@
 #ifndef GLKTERM_H
 #define GLKTERM_H
 
+#include <stdio.h>
 #include "gi_dispa.h"
+#include "queue.h"
 
 /* We define our own TRUE and FALSE and NULL, because ANSI
     is a strange world. */
@@ -37,10 +39,23 @@ typedef struct grect_struct {
 typedef struct glk_window_struct window_t;
 typedef struct glk_stream_struct stream_t;
 typedef struct glk_fileref_struct fileref_t;
+typedef struct glk_schannel_struct schannel_t;
 
 #define MAGIC_WINDOW_NUM (9826)
 #define MAGIC_STREAM_NUM (8269)
 #define MAGIC_FILEREF_NUM (6982)
+#define MAGIC_SCHANNEL_NUM (2698)
+
+/* Holds the current style plus any overrides. Members should be considered
+    internal to gtstyle.c and not be accessed directly by other code. */
+typedef struct styleplus_struct {
+    glui32 style;
+    glsi32 inline_fgcolor;
+    glsi32 inline_bgcolor;
+    glsi32 inline_reverse;
+    int inline_fgi;
+    int inline_bgi;
+} styleplus_t;
 
 struct glk_window_struct {
     glui32 magicnum;
@@ -62,8 +77,9 @@ struct glk_window_struct {
     int echo_line_input; /* applies to future line inputs, not the current */
     glui32 terminate_line_input; /* ditto; this is a bitmask of flags */
 
-    glui32 style;
-    
+    styleplus_t styleplus; /* current style plus inline settings */
+    struct stylehint_struct *stylehints; /* current window hints */
+
     gidispatch_rock_t disprock;
     window_t *next, *prev; /* in the big linked list of windows */
 };
@@ -88,6 +104,7 @@ struct glk_stream_struct {
     
     /* for strtype_File */
     FILE *file; 
+    char *filename;
     glui32 lastop; /* 0, filemode_Write, or filemode_Read */
     
     /* for strtype_Resource */
@@ -120,6 +137,44 @@ struct glk_fileref_struct {
 
     gidispatch_rock_t disprock;
     fileref_t *next, *prev; /* in the big linked list of filerefs */
+};
+
+typedef struct glk_schannel_event_struct schannel_event_t;
+struct glk_schannel_event_struct {
+    event_t event;
+    schannel_t *chan;
+    TAILQ_ENTRY(glk_schannel_event_struct) entries;
+};
+
+struct glk_schannel_struct {
+    glui32 magicnum;
+    glui32 rock;
+
+    /* the finished event to store, if any */
+    schannel_event_t *finished_event_data;
+    /* the Mix channel used or -1 */
+    int mix_channel;
+    /* the Mix chunk loaded or NULL */
+    struct Mix_Chunk *mix_chunk;
+    /* 1 if the channel is in a paused state, even when stopped, or 0 */
+    int paused;
+    /* the starting volume when changing over time */
+    glui32 volume_begin;
+    /* the current (expected) volume */
+    glui32 volume_current;
+    /* the eventual end volume when changing over time */
+    glui32 volume_end;
+    /* the volume event to store, if any */
+    schannel_event_t *volume_event_data;
+    /* the starting time when changing over time */
+    unsigned int volume_ticks_begin;
+    /* the total time when changing over time */
+    unsigned int volume_ticks_duration;
+    /* the timer ID when changing over time or 0 */
+    int volume_sdl_timerid;
+
+    gidispatch_rock_t disprock;
+    TAILQ_ENTRY(glk_schannel_struct) entries;
 };
 
 /* Arguments to keybindings */
@@ -170,6 +225,7 @@ typedef glui32 gli_decomp_block_t[2]; /* count, position */
 #endif /* OPT_WINCHANGED_SIGNAL */
 #endif /* OPT_USE_SIGNALS */
 
+extern char gli_workingdir[256];
 extern unsigned char char_printable_table[256];
 extern unsigned char char_typable_table[256];
 #ifndef OPT_NATIVE_LATIN_1
@@ -193,6 +249,12 @@ extern int pref_window_borders;
 extern int pref_precise_timing;
 extern int pref_historylen;
 extern int pref_prompt_defaults;
+extern int pref_sound;
+extern int pref_color;
+extern int pref_fgcolor;
+extern int pref_bgcolor;
+extern int pref_stylehint;
+extern int pref_emph_underline;
 
 /* Declarations of library internal functions. */
 
@@ -209,6 +271,7 @@ extern int gli_msgin_getchar(char *prompt, int hilite);
 extern void gli_initialize_events(void);
 extern void gli_event_store(glui32 type, window_t *win, glui32 val1, glui32 val2);
 extern void gli_set_halfdelay(void);
+extern void gli_shutdown_events(void);
 
 extern void gli_input_handle_key(int key);
 extern void gli_input_guess_focus(void);
@@ -234,6 +297,23 @@ extern void gli_print_spaces(int len);
 
 extern void gcmd_win_change_focus(window_t *win, glui32 arg);
 extern void gcmd_win_refresh(window_t *win, glui32 arg);
+extern void gcmd_win_resize(window_t *win, glui32 arg);
+
+extern glui32 gli_sound_gestalt(glui32 id);
+extern void gli_initialize_sound(void);
+extern void gli_store_sound_events(void);
+extern void gli_shutdown_sound(void);
+
+extern void gli_initialize_styles(void);
+extern void gli_initialize_window_styles(window_t *win);
+extern int gli_compare_styles(const styleplus_t *styleplus1, const styleplus_t *styleplus2);
+extern int gli_get_color_for_name(const char *name, glsi32 *color);
+extern void gli_reset_styleplus(styleplus_t *styleplus, glui32 style);
+extern int gli_set_window_style(window_t *win, const styleplus_t *styleplus);
+extern void gli_set_inline_colors(stream_t *str, glui32 fg, glui32 bg);
+extern void gli_set_inline_reverse(stream_t *str, glui32 reverse);
+extern void gli_destroy_window_styles(window_t *win);
+extern void gli_shutdown_styles(void);
 
 extern stream_t *gli_new_stream(int type, int readable, int writable, 
     glui32 rock);

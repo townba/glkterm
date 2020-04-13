@@ -21,13 +21,20 @@ static int msgbuf_size = 0;
 
 void gli_msgline_warning(char *msg)
 {
-    char buf[256];
+    const char prefix[] = "Glk library error: ";
+    size_t len;
+    char *buf = NULL;
     
     if (!pref_messageline)
         return;
         
-    sprintf(buf, "Glk library error: %s", msg);
+    len = sizeof(prefix) + strlen(msg) * sizeof(char);
+    buf = malloc(len);
+    if (!buf)
+        return;
+    snprintf(buf, len, "%s%s", prefix, msg);
     gli_msgline(buf);
+    free(buf);
 }
 
 void gli_msgline(char *msg)
@@ -62,7 +69,7 @@ void gli_msgline(char *msg)
 
 void gli_msgline_redraw()
 {
-    if (!pref_messageline)
+    if (!pref_messageline || !msgbuf)
         return;
         
     if (msgbuflen == 0) {

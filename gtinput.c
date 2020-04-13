@@ -37,12 +37,15 @@ static command_t *commands_always(int key)
 {
     static command_t cmdchangefocus = { gcmd_win_change_focus, 0 };
     static command_t cmdrefresh = { gcmd_win_refresh, 0 };
+    static command_t cmdresize = { gcmd_win_resize, 0 };
 
     switch (key) {
         case '\t': 
             return &cmdchangefocus;
         case '\014': /* ctrl-L */
             return &cmdrefresh;
+        case KEY_RESIZE:
+            return &cmdresize;
     }
     
     return NULL;
@@ -434,6 +437,8 @@ static char *key_to_name(int key)
         case KEY_F(12):
             return "func-12";
 #endif /* KEY_F */
+        case KEY_RESIZE:
+            return "resize";
     }
 
     if (key >= 0 && key < 32) {

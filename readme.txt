@@ -1,7 +1,7 @@
 GlkTerm: Curses.h Implementation of the Glk API.
 
-GlkTerm Library: version 1.0.4.
-Glk API which this implements: version 0.7.4.
+GlkTerm Library: version 1.0.5.
+Glk API which this implements: version 0.7.5.
 Designed by Andrew Plotkin <erkyrath@eblong.com>
 http://eblong.com/zarf/glk/
 
@@ -62,8 +62,8 @@ for timed input, this option will be removed.)
 NUM values can be any number. BOOL values can be "yes" or "no", or no
 value to toggle.
 
-Future versions of GlkTerm may have options to control display styles,
-window border styles, and maybe other delightful things.
+Future versions of GlkTerm may have options to control other delightful
+things.
 
 * Notes on building this mess:
 
@@ -258,6 +258,7 @@ When closing windows, + signs can be left in the window borders.
 * Version History
 
 1.0.5###:
+    Added sound and style support.
     Fixed a struct initialization bug in gli_date_to_tm(). (I think this
     caused no problems in practice.)
     Replaced tmpnam() with mkstemp() (thanks David Griffith).

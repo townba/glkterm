@@ -14,6 +14,15 @@
 #include "glkterm.h"
 #include "glkstart.h"
 
+/* Test for compile-time errors. If one of these spouts off, you
+    must edit glk.h and recompile. */
+
+/* Compile-time check: glui32 must be a 32-bit value. */
+typedef int check_sizeof_glui32[(sizeof(glui32) == 4) ? 1 : -1];
+
+/* Compile-time check: glui32 must be unsigned. */
+typedef int check_signedness_glui32[((glui32)(-1) > 0) ? 1 : -1];
+
 /* Declarations of preferences flags. */
 int pref_printversion = FALSE;
 int pref_screenwidth = 0;
@@ -25,34 +34,30 @@ int pref_window_borders = FALSE;
 int pref_precise_timing = FALSE;
 int pref_historylen = 20;
 int pref_prompt_defaults = TRUE;
+int pref_sound = TRUE;
+int pref_color = TRUE;
+int pref_fgcolor = -1;
+int pref_bgcolor = -1;
+int pref_stylehint = TRUE;
+int pref_emph_underline = FALSE;
 
 /* Some constants for my wacky little command-line option parser. */
 #define ex_Void (0)
 #define ex_Int (1)
 #define ex_Bool (2)
+#define ex_Color (3)
 
 static int errflag = FALSE;
-static int inittime = FALSE;
 
 static int extract_value(int argc, char *argv[], char *optname, int type,
     int *argnum, int *result, int defval);
 static int string_to_bool(char *str);
+static int string_to_color(const char *str, glsi32 *color);
 
 int main(int argc, char *argv[])
 {
     int ix, jx, val;
     glkunix_startup_t startdata;
-    
-    /* Test for compile-time errors. If one of these spouts off, you
-        must edit glk.h and recompile. */
-    if (sizeof(glui32) != 4) {
-        printf("Compile-time error: glui32 is not a 32-bit value. Please fix glk.h.\n");
-        return 1;
-    }
-    if ((glui32)(-1) < 0) {
-        printf("Compile-time error: glui32 is not unsigned. Please fix glk.h.\n");
-        return 1;
-    }
     
     /* Now some argument-parsing. This is probably going to hurt. */
     startdata.argc = 0;
@@ -166,7 +171,7 @@ int main(int argc, char *argv[])
         else if (extract_value(argc, argv, "ml", ex_Bool, &ix, &val, pref_messageline))
             pref_messageline = val;
         else if (extract_value(argc, argv, "revgrid", ex_Bool, &ix, &val, pref_reverse_textgrids))
-            pref_reverse_textgrids = val;
+            pref_reverse_textgrids = val ? 1 : 0;
         else if (extract_value(argc, argv, "border", ex_Bool, &ix, &val, pref_window_borders)) {
             pref_window_borders = val;
             pref_override_window_borders = TRUE;
@@ -176,9 +181,27 @@ int main(int argc, char *argv[])
 #ifdef OPT_TIMED_INPUT
         else if (extract_value(argc, argv, "precise", ex_Bool, &ix, &val, pref_precise_timing))
             pref_precise_timing = val;
-#endif /* !OPT_TIMED_INPUT */
+#endif /* OPT_TIMED_INPUT */
+#ifdef GLK_MODULE_SOUND
+        else if (extract_value(argc, argv, "sound", ex_Bool, &ix, &val, pref_sound))
+            pref_sound = val;
+#endif /* GLK_MODULE_SOUND */
+        else if (extract_value(argc, argv, "color", ex_Bool, &ix, &val, pref_color))
+            pref_color = val;
+        else if (extract_value(argc, argv, "fgcolor", ex_Color, &ix, &val, pref_fgcolor))
+            pref_fgcolor = val;
+        else if (extract_value(argc, argv, "bgcolor", ex_Color, &ix, &val, pref_bgcolor))
+            pref_bgcolor = val;
+        else if (extract_value(argc, argv, "stylehint", ex_Bool, &ix, &val, pref_stylehint))
+            pref_stylehint = val;
+#ifdef A_ITALIC
+        else if (extract_value(argc, argv, "emphul", ex_Bool, &ix, &val, pref_emph_underline))
+            pref_emph_underline = val;
+#endif /* A_ITALIC */
         else {
-            printf("%s: unknown option: %s\n", argv[0], argv[ix]);
+            if (!errflag) {
+                printf("%s: unknown option: %s\n", argv[0], argv[ix]);
+            }
             errflag = TRUE;
         }
     }
@@ -213,10 +236,23 @@ int main(int argc, char *argv[])
         printf("  -defprompt BOOL: provide defaults for file prompts (default 'yes')\n");
 #ifdef OPT_TIMED_INPUT
         printf("  -precise BOOL: more precise timing for timed input (burns more CPU time) (default 'no')\n");
-#endif /* !OPT_TIMED_INPUT */
+#endif /* OPT_TIMED_INPUT */
+#ifdef GLK_MODULE_SOUND
+        printf("  -sound BOOL: enable sound (default 'yes')\n");
+#endif /* GLK_MODULE_SOUND */
+        printf("  -color BOOL: enable color (default 'yes')\n");
+        printf("  -fgcolor COLOR: use given color for foreground\n");
+        printf("  -bgcolor COLOR: use given color for background\n");
+        printf("  -stylehint BOOL: enable style hints (default 'yes')\n");
+#if defined(NCURSES_VERSION) && (NCURSES_VERSION_PATCH >= 20130831)
+        printf("  -emphul BOOL: use underline for emphasis instead of italics (default 'no')\n");
+#endif
         printf("  -version: display Glk library version\n");
         printf("  -help: display this list\n");
-        printf("NUM values can be any number. BOOL values can be 'yes' or 'no', or no value to toggle.\n");
+        printf("NUM values can be any number. BOOL values can be 'yes' or 'no', or no value to "
+               "toggle.\n");
+        printf("COLOR values can be names like 'black', 'red', or 'navy', an RGB number like\n"
+               "'#7700FF' or '#70F' (purple), or 'default'.\n");
         return 1;
     }
     
@@ -233,14 +269,16 @@ int main(int argc, char *argv[])
     
     /* Initialize things. */
     gli_initialize_misc();
+    gli_initialize_styles();
     gli_initialize_windows();
     gli_initialize_events();
-    
-    inittime = TRUE;
+#ifdef GLK_MODULE_SOUND
+    gli_initialize_sound();
+#endif
+
     if (!glkunix_startup_code(&startdata)) {
         glk_exit();
     }
-    inittime = FALSE;
     /* Call the program main entry point, and then exit. */
     glk_main();
     glk_exit();
@@ -286,24 +324,23 @@ static int extract_value(int argc, char *argv[], char *optname, int type,
             return TRUE;
     
         case ex_Int:
-            if (*cx == '\0') {
-                if ((*argnum)+1 >= argc) {
-                    cx = "";
+            do {
+                if (*cx == '\0') {
+                    if ((*argnum)+1 >= argc)
+                        break;
+                    cx = argv[(*argnum)+1];
+                    ++*argnum;
                 }
-                else {
-                    (*argnum) += 1;
-                    cx = argv[*argnum];
-                }
-            }
-            val = atoi(cx);
-            if (val == 0 && cx[0] != '0') {
-                printf("%s: %s must be followed by a number\n", 
-                    argv[0], origcx);
-                errflag = TRUE;
-                return FALSE;
-            }
-            *result = val;
-            return TRUE;
+                val = atoi(cx);
+                if (val == 0 && cx[0] != '0')
+                    break;
+                *result = val;
+                return TRUE;
+            } while (0);
+            printf("%s: %s must be followed by a number\n", 
+                argv[0], origcx);
+            errflag = TRUE;
+            return FALSE;
 
         case ex_Bool:
             if (*cx == '\0') {
@@ -320,7 +357,7 @@ static int extract_value(int argc, char *argv[], char *optname, int type,
             else {
                 val = string_to_bool(cx);
                 if (val == -1) {
-                    printf("%s: %s must be followed by a boolean value\n", 
+                    printf("%s: %s must be followed by a boolean value\n",
                         argv[0], origcx);
                     errflag = TRUE;
                     return FALSE;
@@ -331,6 +368,25 @@ static int extract_value(int argc, char *argv[], char *optname, int type,
             *result = val;
             return TRUE;
             
+        case ex_Color:
+            do {
+                if (*cx == '\0') {
+                    if ((*argnum)+1 >= argc)
+                        break;
+                    cx = argv[(*argnum)+1];
+                    ++*argnum;
+                }
+                if (!string_to_color(cx, &val))
+                    break;
+                if (val < -1)
+                    break;
+                *result = val;
+                return TRUE;
+            } while (0);
+            printf("%s: %s must be followed by a color\n",
+                argv[0], origcx);
+            errflag = TRUE;
+            return FALSE;
     }
     
     return FALSE;
@@ -354,29 +410,26 @@ static int string_to_bool(char *str)
     return -1;
 }
 
+static int string_to_color(const char *str, glsi32 *color)
+{
+    return gli_get_color_for_name(str, color);
+}
+
 /* This opens a file for reading or writing. (You cannot open a file
    for appending using this call.)
-
-   This should be used only by glkunix_startup_code(). 
 */
 strid_t glkunix_stream_open_pathname_gen(char *pathname, glui32 writemode,
     glui32 textmode, glui32 rock)
 {
-    if (!inittime)
-        return 0;
     return gli_stream_open_pathname(pathname, (writemode != 0), (textmode != 0), rock);
 }
 
 /* This opens a file for reading. It is a less-general form of 
    glkunix_stream_open_pathname_gen(), preserved for backwards 
    compatibility.
-
-   This should be used only by glkunix_startup_code().
 */
 strid_t glkunix_stream_open_pathname(char *pathname, glui32 textmode, 
     glui32 rock)
 {
-    if (!inittime)
-        return 0;
     return gli_stream_open_pathname(pathname, FALSE, (textmode != 0), rock);
 }

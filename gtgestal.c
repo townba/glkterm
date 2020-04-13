@@ -23,8 +23,8 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr, glui32 arrlen)
     switch (id) {
         
         case gestalt_Version:
-            /* This implements Glk spec version 0.7.4. */
-            return 0x00000704;
+            /* This implements Glk spec version 0.7.5. */
+            return 0x00000705;
         
         case gestalt_LineInput:
             if ((val >= 0 && val < 32) || val == '\177') {
@@ -109,11 +109,16 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr, glui32 arrlen)
 #endif /* GLK_MODULE_UNICODE_NORM */
             
         case gestalt_Sound:
+        case gestalt_Sound2:
         case gestalt_SoundVolume:
         case gestalt_SoundNotify: 
         case gestalt_SoundMusic:
+#ifdef GLK_MODULE_SOUND
+            return gli_sound_gestalt(id);
+#else
             return FALSE;
-  
+#endif
+
         case gestalt_LineInputEcho:
             return TRUE;
 
@@ -133,6 +138,13 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr, glui32 arrlen)
 
         case gestalt_ResourceStream:
             return TRUE;
+
+        case gestalt_GarglkText:
+#ifdef GLK_MODULE_GARGLKTEXT
+            return TRUE;
+#else
+            return FALSE;
+#endif /* GLK_MODULE_GARGLKTEXT */
 
         default:
             return 0;
