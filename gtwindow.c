@@ -48,7 +48,9 @@ static void compute_content_box(void);
     static void gli_sig_interrupt(int val);
 
 #ifdef OPT_WINCHANGED_SIGNAL
-    int screen_size_changed;
+        int screen_size_changed;
+        static void gli_sig_winsize(int val);
+        static sig_t ncurses_sigwinch_handler = NULL;
 #endif /* OPT_WINCHANGED_SIGNAL */
 
 #endif /* OPT_USE_SIGNALS */
@@ -78,7 +80,8 @@ void gli_initialize_windows()
         signal(SIGINT, &gli_sig_interrupt);
 
 #ifdef OPT_WINCHANGED_SIGNAL
-        screen_size_changed = FALSE;
+            screen_size_changed = FALSE;
+            ncurses_sigwinch_handler = signal(SIGWINCH, &gli_sig_winsize);
 #endif /* OPT_WINCHANGED_SIGNAL */
 
 #endif /* OPT_USE_SIGNALS */
@@ -88,7 +91,8 @@ void gli_initialize_windows()
 }
 
 /* Set up all the curses parameters. This is called from main() -- 
-    before gli_initialize_windows, actually. */
+    before gli_initialize_windows, actually -- and also when curses
+    is reinitialized for a screen-size change. */
 void gli_setup_curses()
 {
     initscr();
@@ -114,6 +118,33 @@ static void gli_sig_interrupt(int val)
 {
     just_killed = TRUE;
 }
+
+#ifdef OPT_WINCHANGED_SIGNAL
+
+/* Signal handler for SIGWINCH. */
+static void gli_sig_winsize(int val)
+{
+#ifdef KEY_RESIZE
+    /* Ncurses can install a SIGWINCH handler that handles updates and repaints
+        itself so we don't have to tear down and set up ncurses again (which
+        clears the screen to reinitialize) and then pushes a KEY_RESIZE.
+        However, ncurses can be built without the SIGWINCH handler, so we still
+        need a fallback plan. */
+    if (ncurses_sigwinch_handler && ncurses_sigwinch_handler != SIG_ERR) {
+        ncurses_sigwinch_handler(val);
+        signal(SIGWINCH, &gli_sig_winsize);
+        return;
+    }
+#endif
+    endwin();
+
+    newterm(getenv("TERM"), stdout, stdin);
+    gli_setup_curses();
+    gcmd_win_resize(NULL, 0);
+    signal(SIGWINCH, &gli_sig_winsize);
+}
+
+#endif /* OPT_WINCHANGED_SIGNAL */
 
 #endif /* OPT_USE_SIGNALS */
 

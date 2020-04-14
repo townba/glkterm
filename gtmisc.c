@@ -150,6 +150,7 @@ void glk_exit()
 #endif
     gli_shutdown_events();
     gli_shutdown_styles();
+
     endwin();
     putchar('\n');
     exit(0);

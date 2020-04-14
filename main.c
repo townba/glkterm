@@ -14,15 +14,6 @@
 #include "glkterm.h"
 #include "glkstart.h"
 
-/* Test for compile-time errors. If one of these spouts off, you
-    must edit glk.h and recompile. */
-
-/* Compile-time check: glui32 must be a 32-bit value. */
-typedef int check_sizeof_glui32[(sizeof(glui32) == 4) ? 1 : -1];
-
-/* Compile-time check: glui32 must be unsigned. */
-typedef int check_signedness_glui32[((glui32)(-1) > 0) ? 1 : -1];
-
 /* Declarations of preferences flags. */
 int pref_printversion = FALSE;
 int pref_screenwidth = 0;
@@ -58,6 +49,17 @@ int main(int argc, char *argv[])
 {
     int ix, jx, val;
     glkunix_startup_t startdata;
+    
+    /* Test for compile-time errors. If one of these spouts off, you
+        must edit glk.h and recompile. */
+    if (sizeof(glui32) != 4) {
+        printf("Compile-time error: glui32 is not a 32-bit value. Please fix glk.h.\n");
+        return 1;
+    }
+    if ((glui32)(-1) < 0) {
+        printf("Compile-time error: glui32 is not unsigned. Please fix glk.h.\n");
+        return 1;
+    }
     
     /* Now some argument-parsing. This is probably going to hurt. */
     startdata.argc = 0;
@@ -171,7 +173,7 @@ int main(int argc, char *argv[])
         else if (extract_value(argc, argv, "ml", ex_Bool, &ix, &val, pref_messageline))
             pref_messageline = val;
         else if (extract_value(argc, argv, "revgrid", ex_Bool, &ix, &val, pref_reverse_textgrids))
-            pref_reverse_textgrids = val ? 1 : 0;
+            pref_reverse_textgrids = val;
         else if (extract_value(argc, argv, "border", ex_Bool, &ix, &val, pref_window_borders)) {
             pref_window_borders = val;
             pref_override_window_borders = TRUE;
@@ -199,9 +201,7 @@ int main(int argc, char *argv[])
             pref_emph_underline = val;
 #endif /* A_ITALIC */
         else {
-            if (!errflag) {
-                printf("%s: unknown option: %s\n", argv[0], argv[ix]);
-            }
+            printf("%s: unknown option: %s\n", argv[0], argv[ix]);
             errflag = TRUE;
         }
     }
@@ -244,15 +244,15 @@ int main(int argc, char *argv[])
         printf("  -fgcolor COLOR: use given color for foreground\n");
         printf("  -bgcolor COLOR: use given color for background\n");
         printf("  -stylehint BOOL: enable style hints (default 'yes')\n");
-#if defined(NCURSES_VERSION) && (NCURSES_VERSION_PATCH >= 20130831)
+#ifdef A_ITALIC
         printf("  -emphul BOOL: use underline for emphasis instead of italics (default 'no')\n");
 #endif
         printf("  -version: display Glk library version\n");
         printf("  -help: display this list\n");
-        printf("NUM values can be any number. BOOL values can be 'yes' or 'no', or no value to "
-               "toggle.\n");
-        printf("COLOR values can be names like 'black', 'red', or 'navy', an RGB number like\n"
-               "'#7700FF' or '#70F' (purple), or 'default'.\n");
+        printf("NUM values can be any number. BOOL values can be 'yes' or 'no', or no value to toggle.\n");
+        printf("COLOR values can take CSS color names like 'red' or 'navy', three-digit hexadecimal\n"
+               "numbers like '#7F0' (for yellow-green), or six-digit hexadecimal numbers like '#663399'\n"
+               "(for rebeccapurple).\n");
         return 1;
     }
     
@@ -324,23 +324,24 @@ static int extract_value(int argc, char *argv[], char *optname, int type,
             return TRUE;
     
         case ex_Int:
-            do {
-                if (*cx == '\0') {
-                    if ((*argnum)+1 >= argc)
-                        break;
-                    cx = argv[(*argnum)+1];
-                    ++*argnum;
+            if (*cx == '\0') {
+                if ((*argnum)+1 >= argc) {
+                    cx = "";
                 }
-                val = atoi(cx);
-                if (val == 0 && cx[0] != '0')
-                    break;
-                *result = val;
-                return TRUE;
-            } while (0);
-            printf("%s: %s must be followed by a number\n", 
-                argv[0], origcx);
-            errflag = TRUE;
-            return FALSE;
+                else {
+                    (*argnum) += 1;
+                    cx = argv[*argnum];
+                }
+            }
+            val = atoi(cx);
+            if (val == 0 && cx[0] != '0') {
+                printf("%s: %s must be followed by a number\n", 
+                    argv[0], origcx);
+                errflag = TRUE;
+                return FALSE;
+            }
+            *result = val;
+            return TRUE;
 
         case ex_Bool:
             if (*cx == '\0') {
@@ -357,7 +358,7 @@ static int extract_value(int argc, char *argv[], char *optname, int type,
             else {
                 val = string_to_bool(cx);
                 if (val == -1) {
-                    printf("%s: %s must be followed by a boolean value\n",
+                    printf("%s: %s must be followed by a boolean value\n", 
                         argv[0], origcx);
                     errflag = TRUE;
                     return FALSE;

@@ -17,35 +17,49 @@ SOUND = yes
 
 OPTIONS = -O
 
-PKG_CONFIG=$(shell which pkg-config)
+PKG_CONFIG = $(shell which pkg-config)
+NO_PKG_CONFIG_NCURSES = 0
+NO_PKG_CONFIG_SDL2 = 0
 ifeq (, $(PKG_CONFIG))
-  $(warning *** pkg-config not found. Using defaults.)
+  NO_PKG_CONFIG_NCURSES = 1
+  NO_PKG_CONFIG_SDL2 = 1
+  $(warning *** pkg-config not found.)
+else
+  ifneq (0, $(shell $(PKG_CONFIG) --exists ncurses ; echo $$?))
+    $(warning *** No ncurses package found.)
+    NO_PKG_CONFIG_NCURSES = 1
+  endif
+  ifneq (0, $(shell $(PKG_CONFIG) --exists sdl2 SDL2_mixer ; echo $$?))
+    $(warning *** No ncurses package found.)
+    NO_PKG_CONFIG_NCURSES = 1
+  endif
+endif
 
+ifneq (0, $(NO_PKG_CONFIG_NCURSES))
   # You may need to set directories to pick up libraries.
   #NCURSES_CFLAGS = -I/usr/5include
   #NCURSES_LIBDIRS = -L/usr/5lib
   NCURSES_LIBS = -lncurses
-
-  ifeq ($(SOUND), yes)
-    #SDL_CFLAGS = -I/usr/include/SDL2
-    #SDL_LIBDIRS = -L/usr/lib/SDL2
-    SDL_LIBS = -lSDL2 -lSDL2_mixer
-  endif
 else
-  NCURSES_CFLAGS = $(shell pkg-config --cflags ncurses)
-  NCURSES_LIBDIRS = $(shell pkg-config --libs-only-L ncurses)
-  NCURSES_LIBS = $(shell pkg-config --libs-only-l --libs-only-other ncurses)
-
-  ifeq ($(SOUND), yes)
-    SDL_CFLAGS = $(shell pkg-config --cflags sdl2 sdl2_mixer)
-    SDL_LIBDIRS = $(shell pkg-config --libs-only-L sdl2 sdl2_mixer)
-    SDL_LIBS = $(shell pkg-config --libs-only-l --libs-only-other sdl2 sdl2_mixer)
-  endif
+  NCURSES_CFLAGS = $(shell $(PKG_CONFIG) --cflags ncurses)
+  NCURSES_LIBDIRS = $(shell $(PKG_CONFIG) --libs-only-L ncurses)
+  NCURSES_LIBS = $(shell $(PKG_CONFIG) --libs-only-l --libs-only-other ncurses)
 endif
 
-CFLAGS = $(OPTIONS) $(NCURSES_CFLAGS) $(SDL_CFLAGS)
-LIBDIRS = $(NCURSES_LIBDIRS) $(SDL_LIBDIRS)
-LIBS = $(NCURSES_LIBS) $(SDL_LIBS)
+ifneq (0, $(NO_PKG_CONFIG_SDL2))
+  # You may need to set directories to pick up libraries.
+  #SDL2_CFLAGS =
+  #SDL2_LIBDIRS =
+  SDL2_LIBS =
+else
+  SDL2_CFLAGS = $(shell $(PKG_CONFIG) --cflags sdl2 SDL2_mixer)
+  SDL2_LIBDIRS = $(shell $(PKG_CONFIG) --libs-only-L sdl2 SDL2_mixer)
+  SDL2_LIBS = $(shell $(PKG_CONFIG) --libs-only-l --libs-only-other sdl2 SDL2_mixer)
+endif
+
+CFLAGS = $(OPTIONS) $(NCURSES_CFLAGS) $(SDL2_CFLAGS)
+LIBDIRS = $(NCURSES_LIBDIRS) $(SDL2_LIBDIRS)
+LIBS = $(NCURSES_LIBS) $(SDL2_LIBS)
 
 GLKLIB = libglkterm.a
 
