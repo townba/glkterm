@@ -240,7 +240,7 @@ static giblorb_err_t giblorb_initialize_map(giblorb_map_t *map)
     char *ptr;
     glui32 len;
     glui32 numres;
-    int gotindex = FALSE; 
+    int gotindex = FALSE;
     int pictcount = 0;
 
     for (ix=0; ix<map->numchunks; ix++) {
@@ -322,7 +322,7 @@ static giblorb_err_t giblorb_initialize_map(giblorb_map_t *map)
                 giblorb_unload_chunk(map, ix);
                 gotindex = TRUE;
                 break;
-            
+
             case giblorb_ID_JPEG:
             case giblorb_ID_PNG:
                 chu->auxdatnum = pictcount;
@@ -355,7 +355,7 @@ giblorb_err_t giblorb_destroy_map(giblorb_map_t *map)
     
     if (!map || !map->chunks || map->inited != giblorb_Inited_Magic)
         return giblorb_err_NotAMap;
-    
+
     if (map->auxpict) {
         giblorb_free(map->auxpict);
         map->auxpict = NULL;

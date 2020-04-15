@@ -1,4 +1,4 @@
-/* gi_dispa.c: Dispatch layer for Glk API, version 0.7.4.
+/* gi_dispa.c: Dispatch layer for Glk API, version 0.7.5.
     Designed by Andrew Plotkin <erkyrath@eblong.com>
     http://eblong.com/zarf/glk/
 
@@ -70,6 +70,7 @@ static gidispatch_intconst_t intconstant_table[] = {
     { "gestalt_GarglkText", (0x1100) },
 #endif /* GLK_MODULE_GARGLKTEXT */
     { "gestalt_Graphics", (6) },
+    { "gestalt_GraphicsCharInput", (23) },
     { "gestalt_GraphicsTransparency", (14) },
     { "gestalt_HyperlinkInput", (12) },
     { "gestalt_Hyperlinks", (11) },
@@ -334,7 +335,7 @@ glui32 gidispatch_count_classes()
 
 gidispatch_intconst_t *gidispatch_get_class(glui32 index)
 {
-    if (index < 0 || index >= NUMCLASSES)
+    if (index >= NUMCLASSES)
         return NULL;
     return &(class_table[index]);
 }
@@ -346,7 +347,7 @@ glui32 gidispatch_count_intconst()
 
 gidispatch_intconst_t *gidispatch_get_intconst(glui32 index)
 {
-    if (index < 0 || index >= NUMINTCONSTANTS)
+    if (index >= NUMINTCONSTANTS)
         return NULL;
     return &(intconstant_table[index]);
 }
@@ -358,7 +359,7 @@ glui32 gidispatch_count_functions()
 
 gidispatch_function_t *gidispatch_get_function(glui32 index)
 {
-    if (index < 0 || index >= NUMFUNCTIONS)
+    if (index >= NUMFUNCTIONS)
         return NULL;
     return &(function_table[index]);
 }
@@ -669,6 +670,10 @@ char *gidispatch_prototype(glui32 funcnum)
         case 0x013A: /* stream_open_resource_uni */
             return "3IuIu:Qb";
 #endif /* GLK_MODULE_RESOURCE_STREAM */
+
+#ifdef GLK_EXTEND_PROTOTYPE
+        GLK_EXTEND_PROTOTYPE
+#endif /* GLK_EXTEND_PROTOTYPE */
 
 #ifdef GLK_MODULE_GARGLKTEXT
         case 0x1100: /* garglk_set_zcolors */
@@ -1508,6 +1513,10 @@ void gidispatch_call(glui32 funcnum, glui32 numargs, gluniversal_t *arglist)
             break;
 #endif /* GLK_MODULE_RESOURCE_STREAM */
 
+#ifdef GLK_EXTEND_CALL
+        GLK_EXTEND_CALL
+#endif /* GLK_EXTEND_CALL */
+
 #ifdef GLK_MODULE_GARGLKTEXT
         case 0x1100: /* garglk_set_zcolors */
             garglk_set_zcolors( arglist[0].uint, arglist[1].uint );
@@ -1529,3 +1538,34 @@ void gidispatch_call(glui32 funcnum, glui32 numargs, gluniversal_t *arglist)
     }
 }
 
+#ifdef GI_DISPA_GAME_ID_AVAILABLE
+
+static char *(*game_id_hook)(void) = NULL;
+
+/* Set a function for getting a game ID string. The Glk library may
+   call the supplied function when creating files, so that the files
+   can be put in a game-specific location.
+
+   The function must have the form: char *func(void);
+
+   It should return NULL or a pointer to a (null-terminated) string.
+   (The string will be copied, so it may be in a temporary buffer.)
+*/
+void gidispatch_set_game_id_hook(char *(*hook)(void))
+{
+    game_id_hook = hook;
+}
+
+/* Retrieve a game ID string for the current game. 
+
+   If not NULL, this string may be in a temporary buffer, so the caller
+   must copy it!
+*/
+char *gidispatch_get_game_id(void)
+{
+    if (!game_id_hook)
+        return NULL;
+    return game_id_hook();
+}
+
+#endif /* GI_DISPA_GAME_ID_AVAILABLE */
