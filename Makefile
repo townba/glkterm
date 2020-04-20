@@ -57,9 +57,9 @@ else
   SDL2_LIBS = $(shell $(PKG_CONFIG) --libs-only-l --libs-only-other sdl2 SDL2_mixer)
 endif
 
-CFLAGS = $(OPTIONS) $(CURSES_CFLAGS)
-LIBDIRS = $(CURSES_LIBDIRS)
-LIBS = $(CURSES_LIBS)
+CFLAGS = $(OPTIONS) $(CURSES_CFLAGS) $(SDL2_CFLAGS)
+LIBDIRS = $(CURSES_LIBDIRS) $(SDL2_LIBDIRS)
+LIBS = $(CURSES_LIBS) $(SDL2_LIBS)
 
 GLKLIB = libglkterm.a
 
