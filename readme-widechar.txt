@@ -130,8 +130,8 @@ The conversion macros currently in use are:
 * UCS(x) takes a Latin-1 character and returns a UCS-4 glui32.
 * Lat(x) takes a UCS-4 glui32 and returns a Latin-1 character.  It
 references the glui32 twice, so watch out for side-effects.
-* wchar_to_glui32(x) takes a wchar_t value and returns a UCS-4 glui32.
-* glui32_to_wchar(x) takes a UCS-4 glui32 and returns a wchar_t.
+* glichar_to_glui32(x) takes a wchar_t value and returns a UCS-4 glui32.
+* glui32_to_glichar(x) takes a UCS-4 glui32 and returns a wchar_t.
 
 3.B) gtinput.c
 

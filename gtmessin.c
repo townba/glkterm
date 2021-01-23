@@ -25,8 +25,8 @@
 */
 
 typedef struct inline_struct {
-    wchar_t *prompt;
-    wchar_t *buf;
+    glichar *prompt;
+    glichar *buf;
     int maxlen;
     int len;
     
@@ -42,7 +42,7 @@ typedef struct inline_struct {
 static void handle_key(inline_t *lin, glui32 key);
 static void update_text(inline_t *lin);
 
-glui32 gli_msgin_getchar(wchar_t *prompt, int hilite)
+glui32 gli_msgin_getchar(glichar *prompt, int hilite)
 {
     int orgx, orgy;
     glui32 key;
@@ -52,9 +52,9 @@ glui32 gli_msgin_getchar(wchar_t *prompt, int hilite)
     gli_windows_set_paging(TRUE);
     
     if (!prompt)
-        prompt = L"";
+        prompt = GLITEXT("");
 
-    orgx = LEFT_MARGIN + wcswidth(prompt, wcslen(prompt));
+    orgx = LEFT_MARGIN + GLISTRNWIDTH(prompt, GLISTRLEN(prompt));
 
     /* If the bottom line is reserved for messages, great; clear the message
         line and do input there. If not, we'll have to wipe the bottom line
@@ -72,7 +72,7 @@ glui32 gli_msgin_getchar(wchar_t *prompt, int hilite)
     move(orgy, LEFT_MARGIN);
     if (hilite)
         attron(A_REVERSE);
-    local_addwstr(prompt);
+    local_addstr(prompt);
     if (hilite)
         attrset(0);
 
@@ -98,7 +98,7 @@ glui32 gli_msgin_getchar(wchar_t *prompt, int hilite)
     return key;
 }
 
-int gli_msgin_getline(wchar_t *prompt, wchar_t *buf, int maxlen, int *length)
+int gli_msgin_getline(glichar *prompt, glichar *buf, int maxlen, int *length)
 {
     inline_t indata; /* just allocate it on the stack */
     inline_t *lin = &indata;
@@ -108,7 +108,7 @@ int gli_msgin_getline(wchar_t *prompt, wchar_t *buf, int maxlen, int *length)
     gli_windows_set_paging(TRUE);
 
     if (!prompt)
-        prompt = L"";
+        prompt = GLITEXT("");
     
     lin->done = FALSE;
     lin->accept = FALSE;
@@ -119,7 +119,7 @@ int gli_msgin_getline(wchar_t *prompt, wchar_t *buf, int maxlen, int *length)
     lin->len = *length;
     lin->curs = lin->len;
     
-    lin->orgx = LEFT_MARGIN + wcswidth(prompt, wcslen(prompt));
+    lin->orgx = LEFT_MARGIN + GLISTRNWIDTH(prompt, GLISTRLEN(prompt));
     
     /* See note in gli_msgin_getchar(). */
     if (pref_messageline) {
@@ -133,7 +133,7 @@ int gli_msgin_getline(wchar_t *prompt, wchar_t *buf, int maxlen, int *length)
     }
     
     move(lin->orgy, LEFT_MARGIN);
-    local_addwstr(lin->prompt);
+    local_addstr(lin->prompt);
     update_text(lin);
     
     needrefresh = TRUE;
@@ -143,7 +143,7 @@ int gli_msgin_getline(wchar_t *prompt, wchar_t *buf, int maxlen, int *length)
         glui32 key32;
         int status;
         
-        move(lin->orgy, lin->orgx + wcswidth(lin->buf, lin->curs));
+        move(lin->orgy, lin->orgx + GLISTRNWIDTH(lin->buf, lin->curs));
         if (needrefresh) {
             refresh();
             needrefresh = FALSE;
@@ -177,13 +177,13 @@ int gli_msgin_getline(wchar_t *prompt, wchar_t *buf, int maxlen, int *length)
 static void update_text(inline_t *lin)
 {
     move(lin->orgy, lin->orgx);
-    local_addnwstr(lin->buf, lin->len);
+    local_addnstr(lin->buf, lin->len);
     clrtoeol();
 }
 
 static void handle_key(inline_t *lin, glui32 key)
 {
-    wchar_t *buf = lin->buf; /* cache */
+    glichar *buf = lin->buf; /* cache */
     
     switch (key) {
     
@@ -265,7 +265,7 @@ static void handle_key(inline_t *lin, glui32 key)
             break;
         
         default: /* everything else */
-            if ( (! gli_bad_latin_key(key)) && iswprint(glui32_to_wchar(key))) {
+            if ((gli_good_latin_key(key)) && GLIISPRINT(glui32_to_glichar(key))) {
                 if (lin->len < lin->maxlen) {
                     if (lin->curs < lin->len) {
                         memmove(buf+(lin->curs+1), buf+(lin->curs), 

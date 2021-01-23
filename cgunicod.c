@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wchar.h>
 #include "glk.h"
 #include "glkterm.h"
 
-/* This file (and cgunigen.c) are copied directly from the cheapglk package. */
+/* This file is modified from the one in the cheapglk package. */
 
 void gli_putchar_utf8(glui32 val, FILE *fl)
 {
@@ -54,12 +53,12 @@ glui32 gli_parse_utf8(unsigned char *buf, glui32 buflen,
 
         if ((val0 & 0xe0) == 0xc0) {
             if (pos+1 > buflen) {
-                gli_strict_warning(L"incomplete two-byte character");
+                gli_strict_warning(GLITEXT("incomplete two-byte character"));
                 break;
             }
             val1 = buf[pos++];
             if ((val1 & 0xc0) != 0x80) {
-                gli_strict_warning(L"malformed two-byte character");
+                gli_strict_warning(GLITEXT("malformed two-byte character"));
                 break;
             }
             res = (val0 & 0x1f) << 6;
@@ -70,17 +69,17 @@ glui32 gli_parse_utf8(unsigned char *buf, glui32 buflen,
 
         if ((val0 & 0xf0) == 0xe0) {
             if (pos+2 > buflen) {
-                gli_strict_warning(L"incomplete three-byte character");
+                gli_strict_warning(GLITEXT("incomplete three-byte character"));
                 break;
             }
             val1 = buf[pos++];
             val2 = buf[pos++];
             if ((val1 & 0xc0) != 0x80) {
-                gli_strict_warning(L"malformed three-byte character");
+                gli_strict_warning(GLITEXT("malformed three-byte character"));
                 break;
             }
             if ((val2 & 0xc0) != 0x80) {
-                gli_strict_warning(L"malformed three-byte character");
+                gli_strict_warning(GLITEXT("malformed three-byte character"));
                 break;
             }
             res = (((val0 & 0xf)<<12)  & 0x0000f000);
@@ -92,26 +91,26 @@ glui32 gli_parse_utf8(unsigned char *buf, glui32 buflen,
 
         if ((val0 & 0xf0) == 0xf0) {
             if ((val0 & 0xf8) != 0xf0) {
-                gli_strict_warning(L"malformed four-byte character");
+                gli_strict_warning(GLITEXT("malformed four-byte character"));
                 break;        
             }
             if (pos+3 > buflen) {
-                gli_strict_warning(L"incomplete four-byte character");
+                gli_strict_warning(GLITEXT("incomplete four-byte character"));
                 break;
             }
             val1 = buf[pos++];
             val2 = buf[pos++];
             val3 = buf[pos++];
             if ((val1 & 0xc0) != 0x80) {
-                gli_strict_warning(L"malformed four-byte character");
+                gli_strict_warning(GLITEXT("malformed four-byte character"));
                 break;
             }
             if ((val2 & 0xc0) != 0x80) {
-                gli_strict_warning(L"malformed four-byte character");
+                gli_strict_warning(GLITEXT("malformed four-byte character"));
                 break;
             }
             if ((val3 & 0xc0) != 0x80) {
-                gli_strict_warning(L"malformed four-byte character");
+                gli_strict_warning(GLITEXT("malformed four-byte character"));
                 break;
             }
             res = (((val0 & 0x7)<<18)   & 0x1c0000);
@@ -122,7 +121,7 @@ glui32 gli_parse_utf8(unsigned char *buf, glui32 buflen,
             continue;
         }
 
-        gli_strict_warning(L"malformed character");
+        gli_strict_warning(GLITEXT("malformed character"));
     }
 
     return outpos;
@@ -161,16 +160,15 @@ static glui32 gli_buffer_change_case(glui32 *buf, glui32 len,
     int dest_spec_rest, dest_spec_first;
 
     switch (cond) {
+    case COND_ALL:
+        dest_spec_rest = destcase;
+        dest_spec_first = destcase;
+        break;
     case COND_LINESTART:
         if (changerest)
             dest_spec_rest = CASE_LOWER;
         else
             dest_spec_rest = CASE_IDENT;
-        dest_spec_first = destcase;
-        break;
-    case COND_ALL:
-    default:
-        dest_spec_rest = destcase;
         dest_spec_first = destcase;
         break;
     }
@@ -225,7 +223,7 @@ static glui32 gli_buffer_change_case(glui32 *buf, glui32 len,
         /* complicated cases */
         GET_CASE_SPECIAL(ch, &special);
         if (!special) {
-            gli_strict_warning(L"inconsistency in cgunigen.c");
+            gli_strict_warning(GLITEXT("inconsistency in cgunigen.c"));
             continue;
         }
         ptr = &unigen_special_array[special[target]];

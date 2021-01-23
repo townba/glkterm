@@ -16,7 +16,7 @@
 #include "gtw_buf.h"
 
 /* Array of curses.h attribute values, one for each style. */
-int win_textbuffer_styleattrs[style_NUMSTYLES];
+chtype win_textbuffer_styleattrs[style_NUMSTYLES];
 
 /* Maximum buffer size. The slack value is how much larger than the size 
     we should get before we trim. */
@@ -29,7 +29,7 @@ static long find_line_by_pos(window_textbuffer_t *dwin, long pos);
 static void set_last_run(window_textbuffer_t *dwin, glui32 style);
 static void import_input_line(window_textbuffer_t *dwin, void *buf, 
     int unicode, long len);
-static void export_input_line(void *buf, int unicode, long len, wchar_t *chars);
+static void export_input_line(void *buf, int unicode, long len, glichar *chars);
 
 window_textbuffer_t *win_textbuffer_create(window_t *win)
 {
@@ -39,7 +39,7 @@ window_textbuffer_t *win_textbuffer_create(window_t *win)
     
     dwin->numchars = 0;
     dwin->charssize = 500;
-    dwin->chars = (wchar_t *)malloc(dwin->charssize * sizeof(wchar_t));
+    dwin->chars = (glichar *)malloc(dwin->charssize * sizeof(glichar));
     
     dwin->numlines = 0;
     dwin->linessize = 50;
@@ -69,7 +69,7 @@ window_textbuffer_t *win_textbuffer_create(window_t *win)
     dwin->runs[0].pos = 0;
     
     if (pref_historylen > 1) {
-        dwin->history = (wchar_t **)malloc(sizeof(wchar_t *) * pref_historylen);
+        dwin->history = (glichar **)malloc(sizeof(glichar *) * pref_historylen);
         if (!dwin->history)
             return NULL;
         for (ix=0; ix<pref_historylen; ix++)
@@ -229,12 +229,12 @@ static long layout_chars(window_textbuffer_t *dwin, long chbeg, long chend,
     long cx, cx2, lx, rx;
     long numwords; 
     long linestartpos;
-    wchar_t ch;
+    glichar ch;
     int lastlinetype;
     short style;
     long styleendpos;
     /* cache some values */
-    wchar_t *chars = dwin->chars;
+    glichar *chars = dwin->chars;
     tbrun_t *runs = dwin->runs;
     
     lastlinetype = (startpara) ? wd_EndLine : wd_Text;
@@ -297,20 +297,20 @@ static long layout_chars(window_textbuffer_t *dwin, long chbeg, long chend,
                 ch = chars[cx];
                 cx2 = cx;
                 cx++;
-                if (ch == L'\n') {
+                if (ch == '\n') {
                     wd->type = wd_EndLine;
                     wd->pos = cx2;
                     wd->width = 0;
                     wd->len = 0;
                     wd->style = style;
                 }
-                else if (ch == L' ') {
+                else if (ch == ' ') {
                     wd->type = wd_Blank;
                     wd->pos = cx2;
-                    wd->width = wcwidth(ch);
+                    wd->width = GLICWIDTH(ch);
                     while (cx < chend 
-                            && cx < styleendpos && chars[cx] == L' ') {
-                        wd->width += wcwidth(chars[cx]);
+                            && cx < styleendpos && chars[cx] == ' ') {
+                        wd->width += GLICWIDTH(chars[cx]);
                         cx++;
                     }
                     wd->len = cx - (wd->pos);
@@ -319,11 +319,11 @@ static long layout_chars(window_textbuffer_t *dwin, long chbeg, long chend,
                 else {
                     wd->type = wd_Text;
                     wd->pos = cx2;
-                    wd->width = wcwidth(ch);
+                    wd->width = GLICWIDTH(ch);
                     while (cx < chend 
-                            && cx < styleendpos && chars[cx] != L'\n' 
-                            && chars[cx] != L' ') {
-                        wd->width += wcwidth(chars[cx]);
+                            && cx < styleendpos && chars[cx] != '\n' 
+                            && chars[cx] != ' ') {
+                        wd->width += GLICWIDTH(chars[cx]);
                         cx++;
                     }
                     wd->len = cx - (wd->pos);
@@ -398,7 +398,7 @@ static long layout_chars(window_textbuffer_t *dwin, long chbeg, long chend,
                             numwords++;
                             /* Need to roll back until we have used up extra spaces */
                             for ( wd2->width = 0, cx2 = wd->pos + wd->len - 1; wd2->width < extra; --cx2 ) {
-                                wd2->width += wcwidth(chars[cx2]);
+                                wd2->width += GLICWIDTH(chars[cx2]);
                             }
                             wd2->type = wd->type;
                             wd2->style = wd->style;
@@ -540,7 +540,7 @@ static void updatetext(window_textbuffer_t *dwin)
         /* push ahead to next newline or end-of-text (still in the same
             line as dirtyend, though). move chend and oldchend in parallel,
             since (outside the changed region) nothing has changed. */
-        while (chend < dwin->numchars && dwin->chars[chend] != L'\n') {
+        while (chend < dwin->numchars && dwin->chars[chend] != '\n') {
             chend++;
             oldchend++;
         }
@@ -556,7 +556,7 @@ static void updatetext(window_textbuffer_t *dwin)
         }
         else {
             lnbeg = 0;
-            while (chbeg && dwin->chars[chbeg-1] != L'\n') {
+            while (chbeg && dwin->chars[chbeg-1] != '\n') {
                 chbeg--;
                 oldchbeg--;
             }
@@ -618,9 +618,9 @@ static void updatetext(window_textbuffer_t *dwin)
                 for (wx=0; wx<ln->printwords; wx++) {
                     tbword_t *wd = &(ln->words[wx]);
                     if (wd->type == wd_Text || wd->type == wd_Blank) {
-                        wchar_t *cx = (wchar_t *)&(dwin->chars[wd->pos]);
+                        glichar *cx = (glichar *)&(dwin->chars[wd->pos]);
                         attrset(win_textbuffer_styleattrs[wd->style]);
-                        local_addnwstr(cx, wd->len);
+                        local_addnstr(cx, wd->len);
                         cx += wd->len;
                         count += wd->width;
                     }
@@ -650,15 +650,15 @@ void win_textbuffer_update(window_t *win)
     updatetext(dwin);
 }
 
-void win_textbuffer_putchar(window_t *win, wchar_t ch)
+void win_textbuffer_putchar(window_t *win, glichar ch)
 {
     window_textbuffer_t *dwin = win->data;
     long lx;
     
     if (dwin->numchars >= dwin->charssize) {
         dwin->charssize *= 2;
-        dwin->chars = (wchar_t *)realloc(dwin->chars, 
-            dwin->charssize * sizeof(wchar_t));
+        dwin->chars = (glichar *)realloc(dwin->chars, 
+            dwin->charssize * sizeof(glichar));
     }
     
     lx = dwin->numchars;
@@ -709,7 +709,7 @@ static void set_last_run(window_textbuffer_t *dwin, glui32 style)
 /* This assumes that the text is all within the final style run. 
     Convenient, but true, since this is only used by editing in the
     input text. */
-static void put_text(window_textbuffer_t *dwin, wchar_t *buf, long len, 
+static void put_text(window_textbuffer_t *dwin, glichar *buf, long len, 
     long pos, long oldlen)
 {
     long diff = len - oldlen;
@@ -717,16 +717,16 @@ static void put_text(window_textbuffer_t *dwin, wchar_t *buf, long len,
     if (dwin->numchars + diff > dwin->charssize) {
         while (dwin->numchars + diff > dwin->charssize)
             dwin->charssize *= 2;
-        dwin->chars = (wchar_t *)realloc(dwin->chars, 
-            dwin->charssize * sizeof(wchar_t));
+        dwin->chars = (glichar *)realloc(dwin->chars, 
+            dwin->charssize * sizeof(glichar));
     }
     
     if (diff != 0 && pos+oldlen < dwin->numchars) {
         memmove(dwin->chars+(pos+len), dwin->chars+(pos+oldlen), 
-            ((dwin->numchars - (pos+oldlen)) * sizeof(wchar_t)));
+            ((dwin->numchars - (pos+oldlen)) * sizeof(glichar)));
     }
     if (len > 0) {
-        memmove(dwin->chars+pos, buf, len * sizeof(wchar_t));
+        memmove(dwin->chars+pos, buf, len * sizeof(glichar));
     }
     dwin->numchars += diff;
     
@@ -814,7 +814,7 @@ void win_textbuffer_trim_buffer(window_t *win)
     
     if (dwin->numchars > cnum)
         memmove(dwin->chars, &(dwin->chars[cnum]), 
-            (dwin->numchars - cnum) * sizeof(wchar_t));
+            (dwin->numchars - cnum) * sizeof(glichar));
     dwin->numchars -= cnum;
 
     if (dwin->dirtybeg == -1) {
@@ -914,7 +914,7 @@ void win_textbuffer_place_cursor(window_t *win, int *xpos, int *ypos)
         }
         else {
             *ypos = lx - dwin->scrollline;
-            *xpos = wcswidth(dwin->chars + dwin->lines[lx].pos, dwin->incurs - dwin->lines[lx].pos);
+            *xpos = GLISTRNWIDTH(dwin->chars + dwin->lines[lx].pos, dwin->incurs - dwin->lines[lx].pos);
             if (*xpos >= dwin->width)
                 *xpos = dwin->width-1;
         }
@@ -932,7 +932,7 @@ void win_textbuffer_place_cursor(window_t *win, int *xpos, int *ypos)
         }
         else {
             *ypos = lx - dwin->scrollline;
-            *xpos = wcswidth(dwin->chars + dwin->lines[lx].pos, dwin->lines[lx].len);
+            *xpos = GLISTRNWIDTH(dwin->chars + dwin->lines[lx].pos, dwin->lines[lx].len);
             if (*xpos >= dwin->width)
                 *xpos = dwin->width-1;
         }
@@ -1034,7 +1034,7 @@ void win_textbuffer_cancel_line(window_t *win, event_t *ev)
 
     if (!inecho) {
         /* Wipe the typed text from the buffer. */
-        put_text(dwin, L"", 0, dwin->infence, 
+        put_text(dwin, GLITEXT(""), 0, dwin->infence, 
             dwin->numchars - dwin->infence);
     }
     
@@ -1052,7 +1052,7 @@ void win_textbuffer_cancel_line(window_t *win, event_t *ev)
     dwin->intermkeys = 0;
 
     if (inecho)
-        win_textbuffer_putchar(win, L'\n');
+        win_textbuffer_putchar(win, GLITEXT('\n'));
     
     if (gli_unregister_arr) {
         char *typedesc = (inunicode ? "&+#!Iu" : "&+#!Cn");
@@ -1070,7 +1070,7 @@ static void import_input_line(window_textbuffer_t *dwin, void *buf,
     }
     else {
         int ix;
-        wchar_t *cx = (wchar_t *)malloc(len * sizeof(wchar_t));
+        glichar *cx = (glichar *)malloc(len * sizeof(glichar));
         for (ix=0; ix<len; ix++) {
             cx[ix] = UCS(((char *)buf)[ix]);
         }
@@ -1080,19 +1080,19 @@ static void import_input_line(window_textbuffer_t *dwin, void *buf,
 }
 
 /* Clone in gtw_grid.c */
-static void export_input_line(void *buf, int unicode, long len, wchar_t *chars)
+static void export_input_line(void *buf, int unicode, long len, glichar *chars)
 {
     int ix;
 
     if (!unicode) {
         for (ix=0; ix<len; ix++) {
-            glui32 val = wchar_to_glui32(chars[ix]);
+            glui32 val = glichar_to_glui32(chars[ix]);
             ((char *)buf)[ix] = Lat(val);
         }
     }
     else {
         for (ix=0; ix<len; ix++) {
-            glui32 val = wchar_to_glui32(chars[ix]);
+            glui32 val = glichar_to_glui32(chars[ix]);
             ((glui32 *)buf)[ix] = val;
         }
     }
@@ -1114,7 +1114,7 @@ void gcmd_buffer_accept_key(window_t *win, glui32 arg)
 void gcmd_buffer_accept_line(window_t *win, glui32 arg)
 {
     long len;
-    wchar_t *cx;
+    glichar *cx;
     void *inbuf;
     int inmax, inunicode, inecho;
     glui32 termkey = arg;
@@ -1134,9 +1134,9 @@ void gcmd_buffer_accept_line(window_t *win, glui32 arg)
     
     /* Store in history. */
     if (len) {
-        cx = (wchar_t *)malloc((1+len) * sizeof(wchar_t));
-        memcpy(cx, &(dwin->chars[dwin->infence]), len * sizeof (wchar_t));
-        cx[len] = L'\0';
+        cx = (glichar *)malloc((1+len) * sizeof(glichar));
+        memcpy(cx, &(dwin->chars[dwin->infence]), len * sizeof (glichar));
+        cx[len] = '\0';
         if (dwin->history[dwin->historypresent]) {
             free(dwin->history[dwin->historypresent]);
             dwin->history[dwin->historypresent] = NULL;
@@ -1172,7 +1172,7 @@ void gcmd_buffer_accept_line(window_t *win, glui32 arg)
 
     if (!inecho) {
         /* Wipe the typed text from the buffer. */
-        put_text(dwin, L"", 0, dwin->infence, 
+        put_text(dwin, GLITEXT(""), 0, dwin->infence, 
             dwin->numchars - dwin->infence);
     }
     
@@ -1187,7 +1187,7 @@ void gcmd_buffer_accept_line(window_t *win, glui32 arg)
     dwin->intermkeys = 0;
 
     if (inecho)
-        win_textbuffer_putchar(win, L'\n');
+        win_textbuffer_putchar(win, GLITEXT('\n'));
 
     if (gli_unregister_arr) {
         char *typedesc = (inunicode ? "&+#!Iu" : "&+#!Cn");
@@ -1199,7 +1199,7 @@ void gcmd_buffer_accept_line(window_t *win, glui32 arg)
 void gcmd_buffer_insert_key(window_t *win, glui32 arg)
 {
     window_textbuffer_t *dwin = win->data;
-    wchar_t ch = glui32_to_wchar(arg);
+    glichar ch = glui32_to_glichar(arg);
     
     if (!dwin->inbuf)
         return;
@@ -1256,23 +1256,23 @@ void gcmd_buffer_delete(window_t *win, glui32 arg)
         case gcmd_Delete:
             if (dwin->incurs <= dwin->infence)
                 return;
-            put_text(dwin, L"", 0, dwin->incurs-1, 1);
+            put_text(dwin, GLITEXT(""), 0, dwin->incurs-1, 1);
             break;
         case gcmd_DeleteNext:
             if (dwin->incurs >= dwin->numchars)
                 return;
-            put_text(dwin, L"", 0, dwin->incurs, 1);
+            put_text(dwin, GLITEXT(""), 0, dwin->incurs, 1);
             break;
         case gcmd_KillInput:
             if (dwin->infence >= dwin->numchars)
                 return;
-            put_text(dwin, L"", 0, dwin->infence, 
+            put_text(dwin, GLITEXT(""), 0, dwin->infence, 
                 dwin->numchars - dwin->infence);
             break;
         case gcmd_KillLine:
             if (dwin->incurs >= dwin->numchars)
                 return;
-            put_text(dwin, L"", 0, dwin->incurs, 
+            put_text(dwin, GLITEXT(""), 0, dwin->incurs, 
                 dwin->numchars - dwin->incurs);
             break;
     }
@@ -1284,7 +1284,7 @@ void gcmd_buffer_delete(window_t *win, glui32 arg)
 void gcmd_buffer_history(window_t *win, glui32 arg)
 {
     window_textbuffer_t *dwin = win->data;
-    wchar_t *cx;
+    glichar *cx;
     int len;
     
     if (!dwin->inbuf || !dwin->history)
@@ -1297,9 +1297,9 @@ void gcmd_buffer_history(window_t *win, glui32 arg)
             if (dwin->historypos == dwin->historypresent) {
                 len = dwin->numchars - dwin->infence;
                 if (len > 0) {
-                    cx = (wchar_t *)malloc((len+1) * sizeof(wchar_t));
-                    memcpy(cx, &(dwin->chars[dwin->infence]), len * sizeof(wchar_t));
-                    cx[len] = L'\0';
+                    cx = (glichar *)malloc((len+1) * sizeof(glichar));
+                    memcpy(cx, &(dwin->chars[dwin->infence]), len * sizeof(glichar));
+                    cx[len] = '\0';
                 }
                 else {
                     cx = NULL;
@@ -1313,8 +1313,8 @@ void gcmd_buffer_history(window_t *win, glui32 arg)
                 dwin->historypos += pref_historylen;
             cx = dwin->history[dwin->historypos];
             if (!cx)
-                cx = L"";
-            put_text(dwin, cx, wcslen(cx), dwin->infence, 
+                cx = GLITEXT("");
+            put_text(dwin, cx, GLISTRLEN(cx), dwin->infence, 
                 dwin->numchars - dwin->infence);
             break;
         case gcmd_Down:
@@ -1325,8 +1325,8 @@ void gcmd_buffer_history(window_t *win, glui32 arg)
                 dwin->historypos -= pref_historylen;
             cx = dwin->history[dwin->historypos];
             if (!cx)
-                cx = L"";
-            put_text(dwin, cx, wcslen(cx), dwin->infence, 
+                cx = GLITEXT("");
+            put_text(dwin, cx, GLISTRLEN(cx), dwin->infence, 
                 dwin->numchars - dwin->infence);
             break;
     }

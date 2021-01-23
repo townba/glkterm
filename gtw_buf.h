@@ -41,7 +41,7 @@ typedef struct tbline_struct {
 typedef struct window_textbuffer_struct {
     window_t *owner;
     
-    wchar_t *chars;
+    glichar *chars;
     long numchars;
     long charssize;
     
@@ -72,7 +72,7 @@ typedef struct window_textbuffer_struct {
     long tmpwordssize;
 
     /* Command history. */
-    wchar_t **history;
+    glichar **history;
     int historypos;
     int historyfirst, historypresent;
 
@@ -92,15 +92,14 @@ typedef struct window_textbuffer_struct {
     gidispatch_rock_t inarrayrock;
 } window_textbuffer_t;
 
-/* changed to int per attrset (3ncurses) man page */
-extern int win_textbuffer_styleattrs[style_NUMSTYLES];
+extern chtype win_textbuffer_styleattrs[style_NUMSTYLES];
 
 extern window_textbuffer_t *win_textbuffer_create(window_t *win);
 extern void win_textbuffer_destroy(window_textbuffer_t *dwin);
 extern void win_textbuffer_rearrange(window_t *win, grect_t *box);
 extern void win_textbuffer_redraw(window_t *win);
 extern void win_textbuffer_update(window_t *win);
-extern void win_textbuffer_putchar(window_t *win, wchar_t ch);
+extern void win_textbuffer_putchar(window_t *win, glichar ch);
 extern void win_textbuffer_clear(window_t *win);
 extern void win_textbuffer_trim_buffer(window_t *win);
 extern void win_textbuffer_place_cursor(window_t *win, int *xpos, int *ypos);

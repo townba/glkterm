@@ -5,7 +5,6 @@
 */
 
 #include "gtoption.h"
-#include <wchar.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,26 +15,22 @@
 /* Nothing fancy here. We store a string, and print it on the bottom line.
     If pref_messageline is FALSE, none of these functions do anything. */
 
-static wchar_t *msgbuf = NULL;
+static glichar *msgbuf = NULL;
 static int msgbuflen = 0;
 static int msgbuf_size = 0;
 
-void gli_msgline_warning(wchar_t *msg)
+void gli_msgline_warning(glichar *msg)
 {
-    wchar_t buf[256];
-    int l;
+    glichar buf[256];
     
     if (!pref_messageline)
         return;
-    
-    buf[0] = L'\0';
-    wcsncat(buf, L"Glk library error: ", 256);
-    l = wcslen(buf);
-    wcsncat(buf + l, msg, 256 - l);
+        
+    GLISNPRINTF(buf, 256, GLITEXT("Glk library error: %s"), msg);
     gli_msgline(buf);
 }
 
-void gli_msgline(wchar_t *msg)
+void gli_msgline(glichar *msg)
 {
     int len;
     
@@ -43,23 +38,23 @@ void gli_msgline(wchar_t *msg)
         return;
         
     if (!msg) 
-        msg = L"";
+        msg = GLITEXT("");
     
-    len = wcslen(msg);
+    len = GLISTRLEN(msg);
     if (!msgbuf) {
         msgbuf_size = len+80;
-        msgbuf = (wchar_t *)malloc(msgbuf_size * sizeof(wchar_t));
+        msgbuf = (glichar *)malloc(msgbuf_size * sizeof(glichar));
     }
     else if (len+1 > msgbuf_size) {
         while (len+1 > msgbuf_size)
             msgbuf_size *= 2;
-        msgbuf = (wchar_t *)realloc(msgbuf, msgbuf_size * sizeof(wchar_t));
+        msgbuf = (glichar *)realloc(msgbuf, msgbuf_size * sizeof(glichar));
     }
 
     if (!msgbuf)
         return;
     
-    wcscpy(msgbuf, msg);
+    GLISTRCPY(msgbuf, msg);
     msgbuflen = len;
     
     gli_msgline_redraw();
@@ -75,16 +70,19 @@ void gli_msgline_redraw()
         clrtoeol();
     }
     else {
-        int len;
+        int ix, len;
         
         move(content_box.bottom, 0);
-        local_addwstr(L"  ");
+        addch(' ');
+        addch(' ');
         attron(A_REVERSE);
         if (msgbuflen > content_box.right-3)
             len = content_box.right-3;
         else
             len = msgbuflen;
-        local_addnwstr(msgbuf, len);
+        for (ix=0; ix<len; ix++) {
+            addch(msgbuf[ix]);
+        }
         attrset(0);
         clrtoeol();
     }

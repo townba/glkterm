@@ -7,6 +7,8 @@
 #ifndef GLKTERM_H
 #define GLKTERM_H
 
+#include <wchar.h>
+#include "gtoption.h"
 #include "gi_dispa.h"
 
 /* We define our own TRUE and FALSE and NULL, because ANSI
@@ -19,6 +21,31 @@
 #endif
 #ifndef NULL
 #define NULL 0
+#endif
+
+#ifdef OPT_WIDE_CHARACTERS
+typedef wchar_t glichar;
+#define GLIISPRINT(c) iswprint(c)
+#define GLISNPRINTF swprintf
+#define GLITEXT(s) (GLITEXT2(s))
+#define GLITEXT2(s) (L##s)
+#define GLISTRCAT(s1,s2) wcscat(s1,s2)
+#define GLISTRCPY(s1,s2) wcscpy(s1,s2)
+#define GLISTRLEN(s) wcslen(s)
+#define GLISTRNCPY(s1,s2,n) wcsncpy(s1,s2,n)
+#define GLISTRNWIDTH(s,n) wcswidth(s,n)
+#define GLICWIDTH(c) wcwidth(c)
+#else
+typedef char glichar;
+#define GLIISPRINT(c) isprint(c)
+#define GLISNPRINTF snprintf
+#define GLITEXT(s) (s)
+#define GLISTRCAT(s1,s2) strcat(s1,s2)
+#define GLISTRCPY(s1,s2) strcpy(s1,s2)
+#define GLISTRLEN(s) strlen(s)
+#define GLISTRNCPY(s1,s2,n) strncpy(s1,s2,n)
+#define GLISTRNWIDTH(s,n) strnlen(s,n)
+#define GLICWIDTH(c) (1)
 #endif
 
 /* This macro is called whenever the library code catches an error
@@ -199,12 +226,12 @@ extern int pref_prompt_defaults;
 extern void gli_initialize_misc(void);
 extern char *gli_ascii_equivalent(unsigned char ch);
 
-extern void gli_msgline_warning(wchar_t *msg);
-extern void gli_msgline(wchar_t *msg);
+extern void gli_msgline_warning(glichar *msg);
+extern void gli_msgline(glichar *msg);
 extern void gli_msgline_redraw(void);
 
-extern int gli_msgin_getline(wchar_t *prompt, wchar_t *buf, int maxlen, int *length);
-extern glui32 gli_msgin_getchar(wchar_t *prompt, int hilite);
+extern int gli_msgin_getline(glichar *prompt, glichar *buf, int maxlen, int *length);
+extern glui32 gli_msgin_getchar(glichar *prompt, int hilite);
 
 extern void gli_initialize_events(void);
 extern void gli_event_store(glui32 type, window_t *win, glui32 val1, glui32 val2);
@@ -215,7 +242,7 @@ extern void gli_input_guess_focus(void);
 extern glui32 gli_input_from_native(glui32 key);
 extern int gli_get_key(glui32 *key);
 extern int gli_legal_keycode(glui32 key);
-extern int gli_bad_latin_key(glui32 key);
+extern int gli_good_latin_key(glui32 key);
 
 extern void gli_initialize_windows(void);
 extern void gli_setup_curses(void);
@@ -231,7 +258,7 @@ extern void gli_windows_size_change(void);
 extern void gli_windows_place_cursor(void);
 extern void gli_windows_set_paging(int forcetoend);
 extern void gli_windows_trim_buffers(void);
-extern void gli_window_put_char(window_t *win, glui32 ch);
+extern void gli_window_put_char_uni(window_t *win, glui32 ch);
 extern void gli_windows_unechostream(stream_t *str);
 extern void gli_print_spaces(int len);
 
@@ -256,19 +283,18 @@ extern fileref_t *gli_new_fileref(char *filename, glui32 usage,
 extern void gli_delete_fileref(fileref_t *fref);
 
 extern int local_get_wch(wint_t *ch);
-extern int local_addwstr(const wchar_t *wstr);
-extern int local_mvaddnwstr(int y, int x, const wchar_t *wstr, int n);
-extern int local_addnwstr(const wchar_t *wstr, int n);
+extern int local_addstr(const glichar *wstr);
+extern int local_mvaddnstr(int y, int x, const glichar *wstr, int n);
+extern int local_addnstr(const glichar *wstr, int n);
 
-/* N.B. The following conversion macros are architecture dependent
- * In particular, glui32_to_wchar() will have to be re-written for 
- * each new architecture and C library.
- * This example is for Linux gcc4+ with GNU libc6
+/* Note: The following conversion macros are architecture dependent.
+ * In particular, glui32_to_glichar() will have to be rewritten if wchar_t does
+ * not hold a UTF-32 code point.
  */
 #define UCS(l) ((glui32) (0x000000FF & (l)))
 #define Lat(u) ((u) & 0xFFFFFF00 ? '?' : (char) ((u) & 0xFF))
-#define glui32_to_wchar(x) (x)
-#define wchar_to_glui32(x) (x)
+#define glui32_to_glichar(x) (x)
+#define glichar_to_glui32(x) (x)
 
 /* A macro that I can't think of anywhere else to put it. */
 
@@ -277,7 +303,7 @@ extern int local_addnwstr(const wchar_t *wstr, int n);
     (evp)->win = NULL,    \
     (evp)->val1 = 0,   \
     (evp)->val2 = 0)
-    
+
 #ifdef NO_MEMMOVE
     extern void *memmove(void *dest, void *src, int n);
 #endif /* NO_MEMMOVE */

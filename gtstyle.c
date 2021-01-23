@@ -6,7 +6,6 @@
 
 #include "gtoption.h"
 #include <stdio.h>
-#include <wchar.h>
 #include <curses.h>
 #include "glk.h"
 #include "glkterm.h"
@@ -26,10 +25,10 @@ void glk_stylehint_clear(glui32 wintype, glui32 styl, glui32 hint)
 
 glui32 glk_style_distinguish(window_t *win, glui32 styl1, glui32 styl2)
 {
-    int *styleattrs;
+    chtype *styleattrs;
 
     if (!win) {
-        gli_strict_warning(L"style_distinguish: invalid ref");
+        gli_strict_warning(GLITEXT("style_distinguish: invalid ref"));
         return FALSE;
     }
     
@@ -58,11 +57,11 @@ glui32 glk_style_distinguish(window_t *win, glui32 styl1, glui32 styl2)
 glui32 glk_style_measure(window_t *win, glui32 styl, glui32 hint, 
     glui32 *result)
 {
-    int *styleattrs;
+    chtype *styleattrs;
     glui32 dummy;
 
     if (!win) {
-        gli_strict_warning(L"style_measure: invalid ref");
+        gli_strict_warning(GLITEXT("style_measure: invalid ref"));
         return FALSE;
     }
     

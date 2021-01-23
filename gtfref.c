@@ -5,7 +5,6 @@
 */
 
 #include "gtoption.h"
-#include <wchar.h> /* for mbstate_t */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,44 +29,48 @@ static char lastscriptname[BUFLEN] = "script.txt";
 static char lastcmdname[BUFLEN] = "commands.txt";
 static char lastdataname[BUFLEN] = "file.glkdata";
 
-int gli_wcs_from_mbs(wchar_t *wcsbuf, int len, const char *mbsbuf)
+/* Returns a newly allocated multibyte-character string copy of src. */
+static char *glichars_to_mbs(const glichar *src)
 {
-    mbstate_t state;
-    
-    if ( mbsbuf == NULL || wcsbuf == NULL )
-        return -3; /* invalid parameters */
-    
-    memset (&state, '\0', sizeof (mbstate_t));
-    len = mbsrtowcs (wcsbuf, &mbsbuf, len, &state);
-    if ( mbsbuf == NULL ) {
-        return len; /* success */
+#ifdef OPT_WIDE_CHARACTERS
+    size_t len;
+    char *ret;
+
+    if ((len = wcstombs(0, src, 0)) + 1 == 0)
+        return NULL;
+
+    if ((ret = calloc(sizeof(*ret), len + 1)) != 0) {
+        if (wcstombs(ret, src, len) != len) {
+            free(ret);
+            ret = 0;
+        }
     }
-    else if ( len < 0 ) {
-        return -1; /* invalid input */
-    }
-    else {
-        return -2; /* insufficient space */
-    }
+    return ret;
+#else
+    return strdup(src);
+#endif
 }
 
-int gli_mbs_from_wcs(char *mbsbuf, int len, const wchar_t *wcsbuf)
+/* Returns a newly allocated glichar string copy of src. */
+static glichar *mbs_to_glichars(const char *src)
 {
-    mbstate_t state;
-    
-    if ( mbsbuf == NULL || wcsbuf == NULL )
-        return -3; /* invalid parameters */
-    
-    memset (&state, '\0', sizeof (mbstate_t));
-    len = wcsrtombs (mbsbuf, &wcsbuf, len, &state);
-    if ( wcsbuf == NULL ) {
-        return len; /* success */
+#ifdef OPT_WIDE_CHARACTERS
+    size_t len;
+    glichar *ret;
+
+    if ((len = mbstowcs(0, src, 0)) + 1 == 0)
+        return NULL;
+
+    if ((ret = calloc(sizeof(*ret), len + 1)) != 0) {
+        if (mbstowcs(ret, src, len) != len) {
+            free(ret);
+            ret = 0;
+        }
     }
-    else if ( len < 0 ) {
-        return -1; /* invalid input */
-    }
-    else {
-        return -2; /* insufficient space */
-    }
+    return ret;
+#else
+    return strdup(src);
+#endif
 }
 
 fileref_t *gli_new_fileref(char *filename, glui32 usage, glui32 rock)
@@ -130,7 +133,7 @@ void gli_delete_fileref(fileref_t *fref)
 void glk_fileref_destroy(fileref_t *fref)
 {
     if (!fref) {
-        gli_strict_warning(L"fileref_destroy: invalid ref");
+        gli_strict_warning(GLITEXT("fileref_destroy: invalid ref"));
         return;
     }
     gli_delete_fileref(fref);
@@ -153,18 +156,19 @@ static char *gli_suffix_for_usage(glui32 usage)
 
 frefid_t glk_fileref_create_temp(glui32 usage, glui32 rock)
 {
-    char *filename;
+    char filename[] = "/tmp/glktempfref-XXXXXX";
     fileref_t *fref;
     
-    /* This is a pretty good way to do this on Unix systems. On Macs,
-        it's pretty bad, but this library won't be used on the Mac 
-        -- I hope. I have no idea about the DOS/Windows world. */
+    /* This is a pretty good way to do this on Unix systems. It doesn't
+       make sense on Windows, but anybody compiling this library on
+       Windows has already set up some kind of Unix-like environment,
+       I hope. */
         
-    filename = tmpnam(NULL);
-    
+    mkstemp(filename);
+
     fref = gli_new_fileref(filename, usage, rock);
     if (!fref) {
-        gli_strict_warning(L"fileref_create_temp: unable to create fileref.");
+        gli_strict_warning(GLITEXT("fileref_create_temp: unable to create fileref."));
         return NULL;
     }
     
@@ -177,13 +181,13 @@ frefid_t glk_fileref_create_from_fileref(glui32 usage, frefid_t oldfref,
     fileref_t *fref; 
 
     if (!oldfref) {
-        gli_strict_warning(L"fileref_create_from_fileref: invalid ref");
+        gli_strict_warning(GLITEXT("fileref_create_from_fileref: invalid ref"));
         return NULL;
     }
 
     fref = gli_new_fileref(oldfref->filename, usage, rock);
     if (!fref) {
-        gli_strict_warning(L"fileref_create_from_fileref: unable to create fileref.");
+        gli_strict_warning(GLITEXT("fileref_create_from_fileref: unable to create fileref."));
         return NULL;
     }
     
@@ -196,7 +200,7 @@ frefid_t glk_fileref_create_by_name(glui32 usage, char *name,
     fileref_t *fref;
     char buf[BUFLEN];
     char buf2[2*BUFLEN+10];
-    int len;
+    size_t len;
     char *cx;
     char *suffix;
     
@@ -234,7 +238,7 @@ frefid_t glk_fileref_create_by_name(glui32 usage, char *name,
 
     fref = gli_new_fileref(buf2, usage, rock);
     if (!fref) {
-        gli_strict_warning(L"fileref_create_by_name: unable to create fileref.");
+        gli_strict_warning(GLITEXT("fileref_create_by_name: unable to create fileref."));
         return NULL;
     }
     
@@ -246,85 +250,61 @@ frefid_t glk_fileref_create_by_prompt(glui32 usage, glui32 fmode,
 {
     fileref_t *fref;
     struct stat sbuf;
-    char buf[BUFLEN];
-    char buf2[BUFLEN+32];
+    glichar buf[BUFLEN], prbuf[BUFLEN];
     char newbuf[2*BUFLEN+10];
-    wchar_t prbuf[BUFLEN], wcsbuf[BUFLEN];
-    char *cx;
+    glichar *cx;
     int ix, val, gotdot;
-    char *prompt, *prompt2, *lastbuf;
-    glui32 response;
+    glichar *prompt, *prompt2;
+    char *lastbuf;
+    char *mbs;
     
     switch (usage & fileusage_TypeMask) {
         case fileusage_SavedGame:
-            prompt = "Enter saved game";
+            prompt = GLITEXT("Enter saved game");
             lastbuf = lastsavename;
             break;
         case fileusage_Transcript:
-            prompt = "Enter transcript file";
+            prompt = GLITEXT("Enter transcript file");
             lastbuf = lastscriptname;
             break;
         case fileusage_InputRecord:
-            prompt = "Enter command record file";
+            prompt = GLITEXT("Enter command record file");
             lastbuf = lastcmdname;
             break;
         case fileusage_Data:
         default:
-            prompt = "Enter data file";
+            prompt = GLITEXT("Enter data file");
             lastbuf = lastdataname;
             break;
     }
     
     if (fmode == filemode_Read)
-        prompt2 = "to load";
+        prompt2 = GLITEXT(" to load: ");
     else
-        prompt2 = "to store";
+        prompt2 = GLITEXT(" to store: ");
     
-    sprintf(newbuf, "%s %s: ", prompt, prompt2);
-    
-    val = gli_wcs_from_mbs(prbuf, BUFLEN, newbuf);
-    if ( val < 0 ) {
-        if ( val == -1 )
-            gli_strict_warning(L"fileref_create_by_prompt: invalid prompt.");
-        else
-            gli_strict_warning(L"fileref_create_by_prompt: prompt too long.");
-        return NULL;
-    }
+    GLISTRCPY(prbuf, prompt);
+    GLISTRCAT(prbuf, prompt2);
     
     if (pref_prompt_defaults) {
-        val = gli_wcs_from_mbs(wcsbuf, BUFLEN, lastbuf);
-        if ( val < 0 ) {
-            if ( val == -1 )
-                gli_strict_warning(L"fileref_create_by_prompt: invalid default filename.");
-            else
-                gli_strict_warning(L"fileref_create_by_prompt: default filename too long.");
-            return NULL;
-        }
+        glichar *s = mbs_to_glichars(lastbuf);
+        GLISTRCPY(buf, s);
+        free(s);
+        val = (int)GLISTRLEN(buf);
     }
     else {
-        wcsbuf[0] = L'\0';
+        buf[0] = 0;
         val = 0;
     }
-
-    ix = gli_msgin_getline(prbuf, wcsbuf, BUFLEN - 1, &val);
-
+    
+    ix = gli_msgin_getline(prbuf, buf, BUFLEN - 1, &val);
     if (!ix) {
         /* The player cancelled input. */
         return NULL;
     }
     
     /* Trim whitespace from end and beginning. */
-    wcsbuf[val] = L'\0';
-    
-    val = gli_mbs_from_wcs(buf, BUFLEN, wcsbuf);
-    if ( val < 0 ) {
-        if ( val == -1 )
-            gli_strict_warning(L"fileref_create_by_prompt: invalid filename.");
-        else
-            gli_strict_warning(L"fileref_create_by_prompt: filename too long.");
-        return NULL;
-    }
-
+    buf[val] = '\0';
     while (val 
         && (buf[val-1] == '\n' 
             || buf[val-1] == '\r' 
@@ -334,19 +314,22 @@ frefid_t glk_fileref_create_by_prompt(glui32 usage, glui32 fmode,
     
     for (cx = buf; *cx == ' '; cx++) { }
     
-    val = strlen(cx);
+    val = (int)GLISTRLEN(cx);
     if (!val) {
         /* The player just hit return. */
         return NULL;
     }
 
-    if (cx[0] == '/')
-        strcpy(newbuf, cx);
-    else
-        sprintf(newbuf, "%s/%s", workingdir, cx);
+    mbs = glichars_to_mbs(cx);
+    if (cx[0] == '/') {
+        strcpy(newbuf, mbs);
+    }
+    else {
+        sprintf(newbuf, "%s/%s", workingdir, mbs);
+    }
     
     /* If there is no dot-suffix, add a standard one. */
-    val = strlen(newbuf);
+    val = (int)strlen(newbuf);
     gotdot = FALSE;
     while (val && (buf[val-1] != '/')) {
         if (buf[val-1] == '.') {
@@ -362,33 +345,28 @@ frefid_t glk_fileref_create_by_prompt(glui32 usage, glui32 fmode,
     
     if (fmode != filemode_Read) {
         if (!stat(newbuf, &sbuf) && S_ISREG(sbuf.st_mode)) {
-            sprintf(buf2, "Overwrite \"%s\"? [y/n] ", cx);
-            val = gli_wcs_from_mbs(prbuf, BUFLEN, buf2);
-            if ( val < 0 ) {
-                if ( val == -1 )
-                    gli_strict_warning(L"fileref_create_by_prompt: invalid confirmation prompt.");
-                else
-                    gli_strict_warning(L"fileref_create_by_prompt: confirmation prompt too long.");
-                return NULL;
-            }
-
+            GLISTRCPY(prbuf, GLITEXT("Overwrite \""));
+            GLISTRCAT(prbuf, cx);
+            GLISTRCAT(prbuf, GLITEXT("\"? [y/n] "));
             while (1) {
-                response = gli_msgin_getchar(prbuf, FALSE);
-                if (response == UCS('n') || response == UCS('N') || response == UCS('\033') || response == UCS('\007')) {
+                ix = gli_msgin_getchar(prbuf, FALSE);
+                if (ix == 'n' || ix == 'N' || ix == '\033' || ix == '\007') {
+                    free(mbs);
                     return NULL;
                 }
-                if (response == UCS('y') || response == UCS('Y')) {
+                if (ix == 'y' || ix == 'Y') {
                     break;
                 }
             }
         }
     }
 
-    strcpy(lastbuf, cx);
+    strcpy(lastbuf, mbs);
 
-    fref = gli_new_fileref(newbuf, usage, rock);
+    fref = gli_new_fileref(mbs, usage, rock);
+    free(mbs);
     if (!fref) {
-        gli_strict_warning(L"fileref_create_by_prompt: unable to create fileref.");
+        gli_strict_warning(GLITEXT("fileref_create_by_prompt: unable to create fileref."));
         return NULL;
     }
     
@@ -418,7 +396,7 @@ frefid_t glk_fileref_iterate(fileref_t *fref, glui32 *rock)
 glui32 glk_fileref_get_rock(fileref_t *fref)
 {
     if (!fref) {
-        gli_strict_warning(L"fileref_get_rock: invalid ref.");
+        gli_strict_warning(GLITEXT("fileref_get_rock: invalid ref."));
         return 0;
     }
     
@@ -430,7 +408,7 @@ glui32 glk_fileref_does_file_exist(fileref_t *fref)
     struct stat buf;
     
     if (!fref) {
-        gli_strict_warning(L"fileref_does_file_exist: invalid ref");
+        gli_strict_warning(GLITEXT("fileref_does_file_exist: invalid ref"));
         return FALSE;
     }
     
@@ -449,7 +427,7 @@ glui32 glk_fileref_does_file_exist(fileref_t *fref)
 void glk_fileref_delete_file(fileref_t *fref)
 {
     if (!fref) {
-        gli_strict_warning(L"fileref_delete_file: invalid ref");
+        gli_strict_warning(GLITEXT("fileref_delete_file: invalid ref"));
         return;
     }
     
@@ -462,8 +440,8 @@ void glk_fileref_delete_file(fileref_t *fref)
 /* This should only be called from startup code. */
 void glkunix_set_base_file(char *filename)
 {
-    int ix;
-    
+    size_t ix;
+  
     for (ix=strlen(filename)-1; ix >= 0; ix--) 
         if (filename[ix] == '/')
             break;

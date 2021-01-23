@@ -161,8 +161,8 @@ static command_t *commands_textgrid_line(window_textgrid_t *dwin, glui32 key)
             break;
     }
     
-    /* Non-Latin1 glyphs valid in this locale */
-    if ( key > 256 && iswprint (glui32_to_wchar(key)) )
+    /* Non-Latin-1 glyphs valid in this locale */
+    if (key > 0xFF && GLIISPRINT(glui32_to_glichar(key)))
         return &cmdinsert;
     
     return NULL;
@@ -176,8 +176,6 @@ static command_t *commands_textbuffer(glui32 key)
 {
     static command_t cmdscrolltotop = { gcmd_buffer_scroll, gcmd_UpEnd };
     static command_t cmdscrolltobottom = { gcmd_buffer_scroll, gcmd_DownEnd };
-    /*static command_t cmdscrollupline = { gcmd_buffer_scroll, gcmd_Up };
-      static command_t cmdscrolldownline = { gcmd_buffer_scroll, gcmd_Down };*/
     static command_t cmdscrolluppage = { gcmd_buffer_scroll, gcmd_UpPage };
     static command_t cmdscrolldownpage = { gcmd_buffer_scroll, gcmd_DownPage };
 
@@ -229,7 +227,7 @@ static command_t *commands_textbuffer_line(window_textbuffer_t *dwin, glui32 key
     static command_t cmdhistoryprev = { gcmd_buffer_history, gcmd_Up };
     static command_t cmdhistorynext = { gcmd_buffer_history, gcmd_Down };
 
-    if (key >= 32 && key < 256 && key != 127) 
+    if (key >= 32 && key < 256 && key != '\177') 
         return &cmdinsert;
 
     switch (key) {
@@ -317,7 +315,7 @@ static command_t *commands_textbuffer_line(window_textbuffer_t *dwin, glui32 key
             break;
     }
     
-    if ( key >= 256 && iswprint(glui32_to_wchar(key)) )
+    if (key > 0xFF && GLIISPRINT(glui32_to_glichar(key)))
         return &cmdinsert;
     
     return NULL;
@@ -365,103 +363,99 @@ static command_t *commands_window(window_t *win, glui32 key)
 
 /* Return a string describing a given key. This (sometimes) uses a
     static buffer, which is overwritten with each call. */
-static wchar_t *key_to_name(glui32 key)
+static glichar *key_to_name(glui32 key)
 {
-    static wchar_t kbuf[32];
+    static glichar kbuf[32];
     
     if (key >= 32 && key < 256) {
         if (key == 127) {
-            return L"delete";
+            return GLITEXT("delete");
         }
         kbuf[0] = key;
-        kbuf[1] = L'\0';
+        kbuf[1] = '\0';
         return kbuf;
     }
 
     switch (key) {
-        case L'\t':
-            return L"tab";
-        case L'\033':
-            return L"escape";
+        case '\t':
+            return GLITEXT("tab");
+        case '\033':
+            return GLITEXT("escape");
         case keycode_Down:
-            return L"down-arrow";
+            return GLITEXT("down-arrow");
         case keycode_Up:
-            return L"up-arrow";
+            return GLITEXT("up-arrow");
         case keycode_Left:
-            return L"left-arrow";
+            return GLITEXT("left-arrow");
         case keycode_Right:
-            return L"right-arrow";
+            return GLITEXT("right-arrow");
         case keycode_Home:
-            return L"home";
+            return GLITEXT("home");
         /* Now that we don't have access to the raw code, glk can't
            distinguish between Backspace and Delete.
         case KEY_BACKSPACE:
-            return L"backspace";
+            return GLITEXT("backspace");
         */
         case keycode_Delete:
-            return L"delete-char";
+            return GLITEXT("delete-char");
         /* Now that we don't have access to the raw code, glk can't
            detect IC
         case KEY_IC:
-            return L"insert-char";
+            return GLITEXT("insert-char");
         */
         case keycode_PageDown:
-            return L"page-down";
+            return GLITEXT("page-down");
         case keycode_PageUp:
-            return L"page-up";
+            return GLITEXT("page-up");
         case keycode_Return:
-            return L"enter";
+            return GLITEXT("enter");
         case keycode_End:
-            return L"end";
+            return GLITEXT("end");
         /* Now that we don't have access to the raw code, glk can't
            detect HELP
         case KEY_HELP:
-            return L"help";
+            return GLITEXT("help");
         */
         case keycode_Func1:
-            return L"func-1";
+            return GLITEXT("func-1");
         case keycode_Func2:
-            return L"func-2";
+            return GLITEXT("func-2");
         case keycode_Func3:
-            return L"func-3";
+            return GLITEXT("func-3");
         case keycode_Func4:
-            return L"func-4";
+            return GLITEXT("func-4");
         case keycode_Func5:
-            return L"func-5";
+            return GLITEXT("func-5");
         case keycode_Func6:
-            return L"func-6";
+            return GLITEXT("func-6");
         case keycode_Func7:
-            return L"func-7";
+            return GLITEXT("func-7");
         case keycode_Func8:
-            return L"func-8";
+            return GLITEXT("func-8");
         case keycode_Func9:
-            return L"func-9";
+            return GLITEXT("func-9");
         case keycode_Func10:
-            return L"func-10";
+            return GLITEXT("func-10");
         case keycode_Func11:
-            return L"func-11";
+            return GLITEXT("func-11");
         case keycode_Func12:
-            return L"func-12";
+            return GLITEXT("func-12");
     }
 
     if (key >= 0 && key < 32) {
-        /* swprintf(kbuf, 32, L"ctrl-%c", '@'+key); */
-        int l;
-        kbuf[0] = L'\0';
-        wcsncat(kbuf, L"ctrl-", 32);
-        l = wcslen(kbuf);
-        kbuf[l] = UCS('@'+key);
-        kbuf[l + 1] = L'\0';
+        GLISNPRINTF(kbuf, 32, GLITEXT("ctrl-%c"), '@'+key);
         return kbuf;
     }
 
-    return L"unknown-key";
+    return GLITEXT("unknown-key");
 }
 
-/* Forbidden Latin-1 input values */
-int gli_bad_latin_key (glui32 key)
+/* Valid Latin-1 input values */
+int gli_good_latin_key(glui32 key)
 {
-    return (key <= 31 && key != 10) || (key >= 127 && key <= 159);
+    return (key == 0x0A) || (key >= 0x20 && key < 0x7F) ||
+        (key >= 0xA0 && key < 0x110000) ||
+        (key > (0xFFFFFFFF - keycode_MAXVAL));
 }
 
 /* Allowed key codes */
@@ -469,17 +463,17 @@ int gli_legal_keycode(glui32 key)
 {
     switch(key) {
         case keycode_Left:
-            return has_key(glui32_to_wchar(KEY_LEFT));
+            return has_key(glui32_to_glichar(KEY_LEFT));
         case keycode_Right:
-            return has_key(glui32_to_wchar(KEY_RIGHT));
+            return has_key(glui32_to_glichar(KEY_RIGHT));
         case keycode_Up:
-            return has_key(glui32_to_wchar(KEY_UP));
+            return has_key(glui32_to_glichar(KEY_UP));
         case keycode_Down:
-            return has_key(glui32_to_wchar(KEY_DOWN));
+            return has_key(glui32_to_glichar(KEY_DOWN));
         case keycode_Return:
             return TRUE;
         case keycode_Delete:
-            return has_key(glui32_to_wchar(KEY_BACKSPACE) || has_key(glui32_to_wchar(KEY_DC)));
+            return has_key(glui32_to_glichar(KEY_BACKSPACE)) || has_key(glui32_to_glichar(KEY_DC));
         case keycode_Escape:
             return TRUE;
         case keycode_Tab:
@@ -487,37 +481,37 @@ int gli_legal_keycode(glui32 key)
         case keycode_Unknown:
             return FALSE;
         case keycode_PageUp:
-            return has_key(glui32_to_wchar(KEY_PPAGE));
+            return has_key(glui32_to_glichar(KEY_PPAGE));
         case keycode_PageDown:
-            return has_key(glui32_to_wchar(KEY_NPAGE));
+            return has_key(glui32_to_glichar(KEY_NPAGE));
         case keycode_Home:
-            return has_key(glui32_to_wchar(KEY_HOME));
+            return has_key(glui32_to_glichar(KEY_HOME));
         case keycode_End:
-            return has_key(glui32_to_wchar(KEY_END));
+            return has_key(glui32_to_glichar(KEY_END));
         case keycode_Func1:
-            return has_key(glui32_to_wchar(KEY_F(1)));
+            return has_key(glui32_to_glichar(KEY_F(1)));
         case keycode_Func2:
-            return has_key(glui32_to_wchar(KEY_F(2)));
+            return has_key(glui32_to_glichar(KEY_F(2)));
         case keycode_Func3:
-            return has_key(glui32_to_wchar(KEY_F(3)));
+            return has_key(glui32_to_glichar(KEY_F(3)));
         case keycode_Func4:
-            return has_key(glui32_to_wchar(KEY_F(4)));
+            return has_key(glui32_to_glichar(KEY_F(4)));
         case keycode_Func5:
-            return has_key(glui32_to_wchar(KEY_F(5)));
+            return has_key(glui32_to_glichar(KEY_F(5)));
         case keycode_Func6:
-            return has_key(glui32_to_wchar(KEY_F(6)));
+            return has_key(glui32_to_glichar(KEY_F(6)));
         case keycode_Func7:
-            return has_key(glui32_to_wchar(KEY_F(7)));
+            return has_key(glui32_to_glichar(KEY_F(7)));
         case keycode_Func8:
-            return has_key(glui32_to_wchar(KEY_F(8)));
+            return has_key(glui32_to_glichar(KEY_F(8)));
         case keycode_Func9:
-            return has_key(glui32_to_wchar(KEY_F(9)));
+            return has_key(glui32_to_glichar(KEY_F(9)));
         case keycode_Func10:
-            return has_key(glui32_to_wchar(KEY_F(10)));
+            return has_key(glui32_to_glichar(KEY_F(10)));
         case keycode_Func11:
-            return has_key(glui32_to_wchar(KEY_F(11)));
+            return has_key(glui32_to_glichar(KEY_F(11)));
         case keycode_Func12:
-            return has_key(glui32_to_wchar(KEY_F(12)));
+            return has_key(glui32_to_glichar(KEY_F(12)));
         default:
             return FALSE;
     }
@@ -527,7 +521,7 @@ int gli_legal_keycode(glui32 key)
 glui32 gli_input_from_native(glui32 key)
 {
     /* This is where illegal values get filtered out from character input */
-    if ( gli_bad_latin_key(key) || (key >= 0x100 && ! (gli_legal_keycode(key) || iswprint(glui32_to_wchar(key)))) )
+    if (!gli_good_latin_key(key) || (key >= 0x100 && !(gli_legal_keycode(key) || GLIISPRINT(glui32_to_glichar(key)))))
         return keycode_Unknown;
     else
         return key;
@@ -614,26 +608,26 @@ glui32 gli_translate_key(int status, wint_t key)
     }
     else {
         switch (key) {
-            case L'\t': 
+            case '\t': 
                 arg = keycode_Tab;
                 break;
-            case L'\033':
+            case '\033':
                 arg = keycode_Escape;
                 break;
-            case L'\177': /* delete */
-            case L'\010': /* backspace */
+            case '\177': /* delete */
+            case '\010': /* backspace */
                 arg = keycode_Delete;
                 break;
-            case L'\012': /* ctrl-J */
-            case L'\015': /* ctrl-M */
+            case '\012': /* ctrl-J */
+            case '\015': /* ctrl-M */
                 arg = keycode_Return;
                 break;
             default:
-                if ( key > 0x100 && ! iswprint(key) ) {
+                if ( key > 0x100 && ! GLIISPRINT(key) ) {
                     arg = keycode_Unknown;
                 }
                 else {
-                    arg = wchar_to_glui32(key);
+                    arg = glichar_to_glui32(key);
                 }
                 break;
         }
@@ -707,12 +701,9 @@ void gli_input_handle_key(glui32 key)
         (*cmd->func)(win, arg);
     }
     else {
-        wchar_t buf[256];
-        buf[0] = L'\0';
-        /* swprintf(buf, 256, L"The key <%ls> is not currently defined.", kbuf); */
-        wcsncat(buf, L"The key <", 256);
-        wcsncat(buf, key_to_name(key), 256 - wcslen(buf));
-        wcsncat(buf, L"> is not currently defined.", 256 - wcslen(buf));
+        glichar buf[256];
+        glichar *kbuf = key_to_name(key);
+        GLISNPRINTF(buf, 256, GLITEXT("The key <%s> is not currently defined."), kbuf);
         gli_msgline(buf);
     }
 }

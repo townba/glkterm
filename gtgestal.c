@@ -15,7 +15,26 @@
 #include "glk.h"
 #include "glkterm.h"
 
-int gli_untypable (glui32 key);
+/* Keys that are not typable in this implementation */
+static int gli_typable(glui32 key)
+{
+    /* Many control characters are untypable, for many reasons. */
+    switch (key) {
+    case keycode_Tab: /* reserved by the input system */
+    case '\b': /* parsed as keycode_Delete */
+    case '\f': /* reserved by the input system */
+    case '\n': /* parsed as keycode_Return */
+    case '\r': /* parsed as keycode_Return */
+    case '\t': /* reserved by the input system */
+    case 0x03: /* interrupt/suspend signals */
+    case 0x1A: /* interrupt/suspend signals */
+    case 0x1B: /* parsed as keycode_Escape */
+        return FALSE;
+        break;
+    default:
+        return TRUE;
+    }
+}
 
 glui32 glk_gestalt(glui32 id, glui32 val)
 {
@@ -36,7 +55,7 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr, glui32 arrlen)
              * It is guaranteed to be able to accept the ASCII characters (32 to 126.)
              * never a nonprintable Latin-1 character (0 to 31, 127 to 159)
              */
-            return ! ((gli_bad_latin_key(val) || gli_untypable(val)) || (val >=0x100 && iswprint(glui32_to_wchar(val))));
+            return !((!gli_good_latin_key(val) || !gli_typable(val)) || (val >= 0x100 && GLIISPRINT(glui32_to_glichar(val))));
                 
         case gestalt_CharInput: 
             /*
@@ -55,7 +74,7 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr, glui32 arrlen)
              * keycode_Unknown (any key which has no Latin-1 or special code) 
              The arrow keys and return are nearly certain to be available, rest in order of decreasing importance.
              */
-         return ! ((gli_bad_latin_key(val) || gli_untypable(val)) || (val >=0x100 && ! (gli_legal_keycode(val) || iswprint(glui32_to_wchar(val)))));
+         return !((!gli_good_latin_key(val) || !gli_typable(val)) || (val >=0x100 && ! (gli_legal_keycode(val) || GLIISPRINT(glui32_to_glichar(val)))));
 
         case gestalt_CharOutput: 
         /* Rules
@@ -67,18 +86,18 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr, glui32 arrlen)
          * In Uni mode:
          * gestalt_CharOutput_CannotPrint if ch is an unprintable eight-bit character (0 to 9, 11 to 31, 127 to 159.)
          */
-        /* Is providing wcwidth(val) as the number of glyphs advisable?
+        /* Is providing GLICWIDTH(val) as the number of glyphs advisable?
            As long as usage is limited to deciding how to lay out a grid,
            then it's OK.  But as soon as a user tries to treat a grid 
            containing a character of width==2 as actually containing two 
            half-characters, we're going to have trouble.
          */
-            if ( ! (gli_bad_latin_key(val) || (val >= 0x100 && ! iswprint(glui32_to_wchar(val)))) ) {
-                int width = wcwidth(glui32_to_wchar(val));
+            if (!(!gli_good_latin_key(val) || (val >= 0x100 && ! GLIISPRINT(glui32_to_glichar(val)))) ) {
+                int width = GLICWIDTH(glui32_to_glichar(val));
                 if (arr && arrlen >= 1) {
                     arr[0] = width;
                 }
-                if ( width == 1 )
+                if (width == 1)
                     return gestalt_CharOutput_ExactPrint;
                 else
                     return gestalt_CharOutput_ApproxPrint;
@@ -149,27 +168,6 @@ glui32 glk_gestalt_ext(glui32 id, glui32 val, glui32 *arr, glui32 arrlen)
         default:
             return 0;
 
-    }
-}
-
-/* Keys that are not typable in this implementation */
-int gli_untypable (glui32 key)
-{
-    /* Many control characters are untypable, for many reasons. */
-    switch (key) {
-    case keycode_Tab: /* reserved by the input system */
-    case L'\t':   /* reserved by the input system */
-        case L'\014': /* reserved by the input system */
-    case L'\003': /* interrupt/suspend signals */
-    case L'\032': /* interrupt/suspend signals */
-    case L'\010': /* parsed as keycode_Delete */
-    case L'\012': /* parsed as keycode_Return */
-    case L'\015': /* parsed as keycode_Return */
-    case L'\033': /* parsed as keycode_Escape */
-         return TRUE;
-        break;
-    default:
-        return FALSE;
     }
 }
 

@@ -56,7 +56,7 @@ void gli_initialize_misc()
 
 void glk_exit()
 {   
-    gli_msgin_getchar(L"Hit any key to exit.", TRUE);
+    gli_msgin_getchar(GLITEXT("Hit any key to exit."), TRUE);
 
     gli_streams_close_all();
 

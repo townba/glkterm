@@ -3,12 +3,10 @@
 #include <stdlib.h>
 #include <time.h>
 #include <sys/time.h>
-#include <wchar.h>
 #include "glk.h"
 #include "glkterm.h"
 
-/* This file is copied directly from the cheapglk package.
-   (Except that warning string constants are changed to L"..." constants.) */
+/* This file is modified from the one in the cheapglk package. */
 
 #ifdef GLK_MODULE_DATETIME
 
@@ -104,7 +102,7 @@ void glk_current_time(glktimeval_t *time)
 
     if (gettimeofday(&tv, NULL)) {
         gli_timestamp_to_time(0, 0, time);
-        gli_strict_warning(L"current_time: gettimeofday() failed.");
+        gli_strict_warning(GLITEXT("current_time: gettimeofday() failed."));
         return;
     }
 
@@ -116,12 +114,12 @@ glsi32 glk_current_simple_time(glui32 factor)
     struct timeval tv;
 
     if (factor == 0) {
-        gli_strict_warning(L"current_simple_time: factor cannot be zero.");
+        gli_strict_warning(GLITEXT("current_simple_time: factor cannot be zero."));
         return 0;
     }
 
     if (gettimeofday(&tv, NULL)) {
-        gli_strict_warning(L"current_simple_time: gettimeofday() failed.");
+        gli_strict_warning(GLITEXT("current_simple_time: gettimeofday() failed."));
         return 0;
     }
 
@@ -218,7 +216,7 @@ glsi32 glk_date_to_simple_time_utc(glkdate_t *date, glui32 factor)
     struct tm tm;
 
     if (factor == 0) {
-        gli_strict_warning(L"date_to_simple_time_utc: factor cannot be zero.");
+        gli_strict_warning(GLITEXT("date_to_simple_time_utc: factor cannot be zero."));
         return 0;
     }
 
@@ -237,7 +235,7 @@ glsi32 glk_date_to_simple_time_local(glkdate_t *date, glui32 factor)
     struct tm tm;
 
     if (factor == 0) {
-        gli_strict_warning(L"date_to_simple_time_local: factor cannot be zero.");
+        gli_strict_warning(GLITEXT("date_to_simple_time_local: factor cannot be zero."));
         return 0;
     }
 

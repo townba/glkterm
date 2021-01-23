@@ -48,12 +48,12 @@ void win_blank_redraw(window_t *win)
                and without using wchar_t support, there is no guarantee that ':'
                (or whatever it is replaced with in a translation) will be converted
                to the user's native character set. */
-            local_addnwstr(L":", 1);
+            local_addnstr(GLITEXT(":"), 1);
     }
     
-    local_mvaddnwstr(win->bbox.top, win->bbox.left, L"/", 1);
-    local_mvaddnwstr(win->bbox.top, win->bbox.right-1, L"\\", 1);
-    local_mvaddnwstr(win->bbox.bottom-1, win->bbox.left, L"\\", 1);
-    local_mvaddnwstr(win->bbox.bottom-1, win->bbox.right-1, L"/", 1);
+    local_mvaddnstr(win->bbox.top, win->bbox.left, GLITEXT("/"), 1);
+    local_mvaddnstr(win->bbox.top, win->bbox.right-1, GLITEXT("\\"), 1);
+    local_mvaddnstr(win->bbox.bottom-1, win->bbox.left, GLITEXT("\\"), 1);
+    local_mvaddnstr(win->bbox.bottom-1, win->bbox.right-1, GLITEXT("/"), 1);
 }
 
