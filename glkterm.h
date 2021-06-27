@@ -8,6 +8,8 @@
 #define GLKTERM_H
 
 #include <stdio.h>
+#include <wchar.h>
+#include "gtoption.h"
 #include "gi_dispa.h"
 #include "queue.h"
 
@@ -23,6 +25,28 @@
 #define NULL 0
 #endif
 
+#ifdef OPT_WIDE_CHARACTERS
+typedef wchar_t glichar;
+#define GLIISPRINT(c) iswprint(c)
+#define GLISNPRINTF swprintf
+#define GLITEXT(s) (L##s)
+#define GLISTRCAT(s1,s2) wcscat(s1,s2)
+#define GLISTRCPY(s1,s2) wcscpy(s1,s2)
+#define GLISTRLEN(s) wcslen(s)
+#define GLISTRNWIDTH(s,n) wcswidth(s,n)
+#define GLICWIDTH(c) wcwidth(c)
+#else
+typedef char glichar;
+#define GLIISPRINT(c) isprint(c)
+#define GLISNPRINTF snprintf
+#define GLITEXT(s) (s)
+#define GLISTRCAT(s1,s2) strcat(s1,s2)
+#define GLISTRCPY(s1,s2) strcpy(s1,s2)
+#define GLISTRLEN(s) strlen(s)
+#define GLISTRNWIDTH(s,n) strnlen(s,n)
+#define GLICWIDTH(c) (1)
+#endif
+
 /* This macro is called whenever the library code catches an error
     or illegal operation from the game program. */
 
@@ -35,6 +59,12 @@ typedef struct grect_struct {
     int left, top;
     int right, bottom;
 } grect_t;
+
+typedef struct gkey_struct {
+    glui32 key32;
+    wint_t curses;
+    int function;
+} gkey_t;
 
 typedef struct glk_window_struct window_t;
 typedef struct glk_stream_struct stream_t;
@@ -261,21 +291,25 @@ extern int pref_emph_underline;
 extern void gli_initialize_misc(void);
 extern char *gli_ascii_equivalent(unsigned char ch);
 
-extern void gli_msgline_warning(char *msg);
-extern void gli_msgline(char *msg);
+extern void gli_msgline_warning(glichar *msg);
+extern void gli_msgline_warningf(const glichar *format, ...);
+extern void gli_msgline(glichar *msg);
 extern void gli_msgline_redraw(void);
 
-extern int gli_msgin_getline(char *prompt, char *buf, int maxlen, int *length);
-extern int gli_msgin_getchar(char *prompt, int hilite);
+extern int gli_msgin_getline(glichar *prompt, glichar *buf, int maxlen, int *length);
+extern glui32 gli_msgin_getchar(glichar *prompt, int hilite);
 
 extern void gli_initialize_events(void);
 extern void gli_event_store(glui32 type, window_t *win, glui32 val1, glui32 val2);
 extern void gli_set_halfdelay(void);
 extern void gli_shutdown_events(void);
 
-extern void gli_input_handle_key(int key);
+extern void gli_input_handle_key(const gkey_t *gkey);
 extern void gli_input_guess_focus(void);
-extern glui32 gli_input_from_native(int key);
+extern glui32 gli_input_from_native(glui32 key32);
+extern int gli_get_key(gkey_t *gkey);
+extern int gli_legal_keycode(glui32 key32);
+extern int gli_good_latin_key(glui32 key32);
 
 extern void gli_initialize_windows(void);
 extern void gli_setup_curses(void);
@@ -291,7 +325,7 @@ extern void gli_windows_size_change(void);
 extern void gli_windows_place_cursor(void);
 extern void gli_windows_set_paging(int forcetoend);
 extern void gli_windows_trim_buffers(void);
-extern void gli_window_put_char(window_t *win, char ch);
+extern void gli_window_put_char_uni(window_t *win, glui32 ch);
 extern void gli_windows_unechostream(stream_t *str);
 extern void gli_print_spaces(int len);
 
@@ -331,6 +365,20 @@ extern void gli_streams_close_all(void);
 extern fileref_t *gli_new_fileref(char *filename, glui32 usage, 
     glui32 rock);
 extern void gli_delete_fileref(fileref_t *fref);
+
+extern int local_get_wch(wint_t *ch);
+extern int local_addstr(const glichar *wstr);
+extern int local_mvaddnstr(int y, int x, const glichar *wstr, int n);
+extern int local_addnstr(const glichar *wstr, int n);
+
+/* Note: The following conversion macros are architecture dependent.
+ * In particular, glui32_to_glichar() will have to be rewritten if wchar_t does
+ * not hold a UTF-32 code point.
+ */
+#define UCS(l) ((glui32) (0x000000FF & (l)))
+#define Lat(u) ((u) & 0xFFFFFF00 ? '?' : (char) ((u) & 0xFF))
+#define glui32_to_glichar(x) (x)
+#define glichar_to_glui32(x) (x)
 
 /* A macro that I can't think of anywhere else to put it. */
 

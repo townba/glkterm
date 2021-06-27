@@ -664,7 +664,7 @@ glui32 glk_style_distinguish(window_t *win, glui32 styl1, glui32 styl2)
     const stylehint_t *stylehint1, *stylehint2;
 
     if (!win) {
-        gli_strict_warning("style_distinguish: invalid ref");
+        gli_strict_warning(GLITEXT("style_distinguish: invalid ref"));
         return FALSE;
     }
     
@@ -694,7 +694,7 @@ glui32 glk_style_measure(window_t *win, glui32 styl, glui32 hint,
     glui32 dummy;
 
     if (!win) {
-        gli_strict_warning("style_measure: invalid ref");
+        gli_strict_warning(GLITEXT("style_measure: invalid ref"));
         return FALSE;
     }
     

@@ -72,7 +72,8 @@ void glk_select(event_t *event)
     gli_input_guess_focus();
     
     while (TAILQ_EMPTY(&events)) {
-        int key;
+        gkey_t gkey;
+        int gotkey;
     
         /* It would be nice to display a "hit any key to continue" message in
             all windows which require it. */
@@ -81,7 +82,7 @@ void glk_select(event_t *event)
             refresh();
             needrefresh = FALSE;
         }
-        key = getch();
+        gotkey = gli_get_key(&gkey);
         
 #ifdef OPT_USE_SIGNALS
         if (just_killed) {
@@ -91,14 +92,14 @@ void glk_select(event_t *event)
         }
 #endif /* OPT_USE_SIGNALS */
         
-        if (key != ERR) {
+        if (gotkey) {
             /* An actual key has been hit */
-            gli_input_handle_key(key);
+            gli_input_handle_key(&gkey);
             needrefresh = TRUE;
             continue;
         }
 
-        /* key == ERR; it's an idle event */
+        /* it's an idle event */
         
 #ifdef OPT_USE_SIGNALS
 
@@ -160,7 +161,7 @@ void glk_select(event_t *event)
 void glk_select_poll(event_t *event)
 {
     event_node_t *event_node = NULL;
-
+    
     gli_event_clearevent(event);
     
     gli_windows_update();

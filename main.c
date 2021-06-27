@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curses.h>
+#include <locale.h>
 #include "glk.h"
 #include "glkterm.h"
 #include "glkstart.h"
@@ -49,6 +50,8 @@ int main(int argc, char *argv[])
 {
     int ix, jx, val;
     glkunix_startup_t startdata;
+    
+    setlocale (LC_CTYPE, "");
     
     /* Test for compile-time errors. If one of these spouts off, you
         must edit glk.h and recompile. */

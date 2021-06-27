@@ -265,6 +265,10 @@ When closing windows, + signs can be left in the window borders.
     ### should add NO_TIMEGM_AVAIL
 
 1.0.4:
+    Fixed a bug in the "overwrite file?" prompt. (Introduced this in
+    1.0.3, widechar only.)
+    Fixed a bug where the return key wasn't accepted in key input.
+    (Again, widechar only.)
     Updated the Blorb-resource functions to understand FORM chunks
     (Glk 0.7.4 amendment).
     Added stub for autosave/autorestore hooks. (This library does not
@@ -278,7 +282,8 @@ When closing windows, + signs can be left in the window borders.
 
 1.0.2:
     Fixed a really stupid bug where glk_put_char_uni() was sending text
-    to stdout instead of curses, thus destroying the screen.
+    to stdout instead of curses, thus destroying the screen. (Master
+    branch only; widechar branch was correct.)
     Fixed a bug with reading and writing to the same file without a
     reposition operation in between.
     In gi_dispa.c, fixed a notation that was preventing stream_open_memory

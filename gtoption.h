@@ -227,5 +227,26 @@
     The second is for a keyboard that can only generate 7-bit ASCII.
 */
 
+#define OPT_WIDE_CHARACTERS
+
+/* OPT_WIDE_CHARACTERS should be defined if the library is to support wide
+    characters.
+ */
+
+/*#define LOCAL_NCURSESW*/
+
+/* LOCAL_NCURSESW should be defined if you attempt to build this library on a
+   system where curses does not implement the *wch* and *wstr* functions, but
+   does allow I/O in local character sets such as UTF-8.
+
+   Your mileage may vary, a lot.
+
+   Under Ncurses 5.2 on OSX 10.3.9, for example, UTF-8 I/O can corrupt Ncurses'
+   idea of where the cursor is, particularly if output is mixed with calls to
+   move() and refresh(). In GlkTerm, this results in the user seeing garbled
+   wide-character text while doing line input, even though the input is
+   interpreted correctly.
+*/
+
 #endif /* GTOPTION_H */
 

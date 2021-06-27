@@ -4,23 +4,25 @@
     http://www.eblong.com/zarf/glk/index.html
 */
 
+#define _XOPEN_SOURCE /* wcwidth */
 #include "gtoption.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <memory.h>
+#include <wchar.h>
 #include <curses.h>
 #include "glk.h"
 #include "glkterm.h"
 #include "gtw_grid.h"
 
 /* A grid of characters. We store the window as a list of lines (see
-    gtwgrid.h); within a line, just store an array of characters and
-    an array of style bytes, the same size. (If we ever have more than
-    255 styles, things will have to be changed, but that's unlikely.)
+ gtw_grid.h); within a line, just store an array of characters and
+ an array of styles, the same size.
 */
 
 static void init_lines(window_textgrid_t *dwin, int beg, int end, int linewid);
 static void final_lines(window_textgrid_t *dwin);
-static void export_input_line(void *buf, int unicode, long len, char *chars);
+static void export_input_line(void *buf, int unicode, long len, glichar *chars);
 static void import_input_line(tgline_t *ln, int offset, void *buf, 
     int unicode, long len);
 
@@ -36,6 +38,24 @@ static void import_input_line(tgline_t *ln, int offset, void *buf,
     if (ll->dirtyend == -1 || (px)+1 > ll->dirtyend)   \
         ll->dirtyend = (px)+1;   \
     
+
+/* lnoffset could be made inline if the compiler supports it */
+int lnoffset(tgline_t *ln, int pos)
+{
+    /* N.B. ln->size only gives us protection against buffer overflow
+     * since we don't have access to width, invalid pos will give an
+     * invalid return value.
+     */
+    int x = GLICWIDTH(ln->chars[0]);
+    int i = 0;
+
+    while ( x <= pos && i < ln->size ) {
+        if ( ++i < ln->size )
+            x += GLICWIDTH(ln->chars[i]);
+    }
+
+    return i;
+}
 
 window_textgrid_t *win_textgrid_create(window_t *win)
 {
@@ -119,8 +139,8 @@ void win_textgrid_rearrange(window_t *win, grect_t *box)
             if (newwid > ln->size) {
                 oldval = ln->size;
                 ln->size = (newwid+1) * 2;
-                ln->chars = (char *)realloc(ln->chars, 
-                    ln->size * sizeof(char));
+                ln->chars = (glichar *)realloc(ln->chars, 
+                    ln->size * sizeof(glichar));
                 ln->styleplusses = realloc(ln->styleplusses, 
                     ln->size * sizeof(styleplus_t));
                 if (!ln->chars || !ln->styleplusses) {
@@ -151,7 +171,7 @@ static void init_lines(window_textgrid_t *dwin, int beg, int end, int linewid)
         ln->size = (linewid+1);
         ln->dirtybeg = -1;
         ln->dirtyend = -1;
-        ln->chars = (char *)malloc(ln->size * sizeof(char));
+        ln->chars = (glichar *)malloc(ln->size * sizeof(glichar));
         ln->styleplusses = malloc(ln->size * sizeof(styleplus_t));
         if (!ln->chars || !ln->size) {
             dwin->lines = NULL;
@@ -186,7 +206,7 @@ static void final_lines(window_textgrid_t *dwin)
 
 static void updatetext(window_textgrid_t *dwin, int drawall)
 {
-    int ix, jx, beg, iix;
+    int ix, jx, beg;
     int orgx, orgy;
     styleplus_t curstyleplus;
     
@@ -226,19 +246,18 @@ static void updatetext(window_textgrid_t *dwin, int drawall)
         
         ix=ln->dirtybeg;
         while (ix<ln->dirtyend) {
-            unsigned char *ucx;
+            glichar *ucx;
             beg = ix;
-            curstyleplus = ln->styleplusses[beg];
-            for (ix++;
-                 (ix<ln->dirtyend &&
-                  gli_compare_styles(&ln->styleplusses[ix], &curstyleplus) == 0);
-                 ix++) { }
+            curstyleplus = ln->styleplusses[lnoffset(ln, beg)];
+            for (ix += GLICWIDTH(ln->chars[lnoffset(ln, ix)]);
+                 (ix < ln->dirtyend &&
+                  gli_compare_styles(&ln->styleplusses[lnoffset(ln, ix)], &curstyleplus) == 0);
+                 ix += GLICWIDTH(ln->chars[lnoffset(ln, ix)])) { }
             gli_set_window_style(dwin->owner, &curstyleplus);
-            ucx = (unsigned char *)ln->chars; /* unsigned, so that addch() doesn't
-                get fed any high style bits. */
-            for (iix=beg; iix<ix; iix++) {
-                addch(ucx[iix]);
-            }
+            /* TODO(townba): unsigned, so that addch() doesn't
+               get fed any high style bits. */
+            ucx = ln->chars;
+            local_addnstr(ucx + lnoffset(ln, beg), lnoffset(ln, ix) - lnoffset(ln, beg));
         }
         
         ln->dirtybeg = -1;
@@ -253,7 +272,6 @@ static void updatetext(window_textgrid_t *dwin, int drawall)
 
 void win_textgrid_redraw(window_t *win)
 {
-    int jx, ix;
     window_textgrid_t *dwin = win->data;
 
     if (!dwin->lines)
@@ -264,7 +282,6 @@ void win_textgrid_redraw(window_t *win)
 
 void win_textgrid_update(window_t *win)
 {
-    int jx, ix;
     window_textgrid_t *dwin = win->data;
 
     if (!dwin->lines)
@@ -273,16 +290,20 @@ void win_textgrid_update(window_t *win)
     updatetext(dwin, FALSE);
 }
 
-void win_textgrid_putchar(window_t *win, char ch)
+void win_textgrid_putchar(window_t *win, glichar ch)
 {
     window_textgrid_t *dwin = win->data;
     tgline_t *ln;
+    size_t ch_width = GLICWIDTH(ch);
+    int curx_offset;
+    size_t target_width;
     
     /* Canonicalize the cursor position. That is, the cursor may have been
-        left outside the window area; wrap it if necessary. */
+     left outside the window area, or may be too close to the edge to print
+     the next character; wrap it if necessary. */
     if (dwin->curx < 0)
         dwin->curx = 0;
-    else if (dwin->curx >= dwin->width) {
+    else if (dwin->curx > 0 && dwin->curx + ch_width > dwin->width) {
         dwin->curx = 0;
         dwin->cury++;
     }
@@ -300,12 +321,67 @@ void win_textgrid_putchar(window_t *win, char ch)
     
     ln = &(dwin->lines[dwin->cury]);
     
+    /* We will use this repeatedly: */
+    curx_offset = lnoffset(ln, dwin->curx);
+    
+    /* What if we overlap with one or more 2-glyph characters? */
+    /* N.B. we are assuming 2-glyph here.  We really should handle arbitrary glyph width */
+    
+    /* Test for overlapping with the second half of a 2-glyph character */
+    if ( dwin->curx > 0 && lnoffset(ln, dwin->curx - 1) == curx_offset ) {
+        /* Shift rest of line buffer 1 cell to the right */
+        /* We don't have to check for memory boundaries because the 2-glyph 
+         * character we are overlapping guarantees us that we are not using
+         * the entire chars[] buffer.
+         */
+        memmove(ln->chars + curx_offset + 2, ln->chars + curx_offset + 1, (ln->size - curx_offset - 1) * sizeof(glichar));
+            /* obliterate the previous half-character */
+        /* N.B. This effectively changes the value of lnoffset(ln, dwin->curx) */
+        ln->chars[curx_offset++] = '?';
+        /* obliterate target cell, to make calculations below consistent */
+        ln->chars[curx_offset] = '?';
+        setposdirty(dwin, ln, dwin->curx - 1, dwin->cury);
+    }
+
+    target_width = GLICWIDTH(ln->chars[curx_offset]);
+
+    /* Test for overlapping with the first half of a 2-glyph character */
+    /* N.B. Because we have already dealt with any overlaps with a previous character
+     * we know that we start on a character boundary
+     */
+    /* N.B. the memmoves below are exclusive cases to the memmove above */
+    if ( target_width < ch_width ) {
+        /* We can't fit this character in the needed (grid) space. */
+        if ( GLICWIDTH(ln->chars[curx_offset + 1]) > 1 ) {
+            /* Next character is wide, so it will become garbage. */
+            ln->chars[curx_offset + 1] = '?';
+            setposdirty(dwin, ln, dwin->curx + ch_width, dwin->cury);
+        }
+        else {
+            /* Next character is narrow, so we'll cover it entirely. */
+            memmove(ln->chars + curx_offset + 1, ln->chars + curx_offset + 2, (ln->size - curx_offset - 2) * sizeof(glichar));
+            /* We don't need to fill in ln->chars[ln->width - 1], because it will never get printed. */
+        }
+    }
+    else if ( target_width > ch_width ) {
+        /* This character can't fill the space we are filling. */
+        /* Insert a dummy cell after this character. */
+        memmove(ln->chars + curx_offset + 2, ln->chars + curx_offset + 1, (ln->size - curx_offset - 2) * sizeof(glichar));
+        /* Set next character to ? */
+        ln->chars[curx_offset + 1] = '?';
+        setposdirty(dwin, ln, dwin->curx + ch_width, dwin->cury);
+    }
+    
+    ln->chars[curx_offset] = ch;
+    ln->styleplusses[curx_offset] = win->styleplus;
     setposdirty(dwin, ln, dwin->curx, dwin->cury);
+    if ( ch_width > 1 )
+        setposdirty(dwin, ln, dwin->curx + 1, dwin->cury);
     
     ln->chars[dwin->curx] = ch;
     ln->styleplusses[dwin->curx] = win->styleplus;
     
-    dwin->curx++;
+    dwin->curx += ch_width;
     /* We can leave the cursor outside the window, since it will be
         canonicalized next time a character is printed. */
 }
@@ -395,7 +471,6 @@ void win_textgrid_init_line(window_t *win, void *buf, int unicode,
         initlen = maxlen;
         
     if (initlen) {
-        int ix;
         tgline_t *ln = &(dwin->lines[dwin->inorgy]);
 
         if (initlen) {
@@ -405,12 +480,12 @@ void win_textgrid_init_line(window_t *win, void *buf, int unicode,
         
         setposdirty(dwin, ln, dwin->inorgx+0, dwin->inorgy);
         if (initlen > 1) {
-            setposdirty(dwin, ln, dwin->inorgx+(initlen-1), dwin->inorgy);
+            setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+initlen-1), dwin->inorgy);
         }
             
         dwin->incurs += initlen;
         dwin->inlen += initlen;
-        dwin->curx = dwin->inorgx+dwin->incurs;
+        dwin->curx = GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->incurs);
         dwin->cury = dwin->inorgy;
     }
 
@@ -423,7 +498,6 @@ void win_textgrid_init_line(window_t *win, void *buf, int unicode,
 /* Abort line input, storing whatever's been typed so far. */
 void win_textgrid_cancel_line(window_t *win, event_t *ev)
 {
-    int ix;
     void *inbuf;
     int inoriglen, inmax, inunicode;
     gidispatch_rock_t inarrayrock;
@@ -479,14 +553,12 @@ static void import_input_line(tgline_t *ln, int offset, void *buf,
         for (ix=0; ix<len; ix++) {
             char ch = ((char *)buf)[ix];
             gli_reset_styleplus(&ln->styleplusses[offset+ix], style_Input);
-            ln->chars[offset+ix] = ch;
+            ln->chars[offset+ix] = UCS(ch);
         }
     }
     else {
         for (ix=0; ix<len; ix++) {
             glui32 kval = ((glui32 *)buf)[ix];
-            if (!(kval >= 0 && kval < 256))
-                kval = '?';
             gli_reset_styleplus(&ln->styleplusses[offset+ix], style_Input);
             ln->chars[offset+ix] = kval;
         }
@@ -494,23 +566,21 @@ static void import_input_line(tgline_t *ln, int offset, void *buf,
 }
 
 /* Clone in gtw_buf.c */
-static void export_input_line(void *buf, int unicode, long len, char *chars)
+static void export_input_line(void *buf, int unicode, long len, glichar *chars)
 {
     int ix;
 
     if (!unicode) {
         for (ix=0; ix<len; ix++) {
-            int val = chars[ix];
-            glui32 kval = gli_input_from_native(val & 0xFF);
-            if (!(kval >= 0 && kval < 256))
-                kval = '?';
-            ((unsigned char *)buf)[ix] = kval;
+            glichar val = chars[ix];
+            glui32 kval = gli_input_from_native(val);
+            ((char *)buf)[ix] = Lat(kval);
         }
     }
     else {
         for (ix=0; ix<len; ix++) {
-            int val = chars[ix];
-            glui32 kval = gli_input_from_native(val & 0xFF);
+            glichar val = chars[ix];
+            glui32 kval = gli_input_from_native(val);
             ((glui32 *)buf)[ix] = kval;
         }
     }
@@ -527,14 +597,13 @@ void gcmd_grid_accept_key(window_t *win, glui32 arg)
 }
 
 /* Return or enter, during line input. Ends line input.
-   Special terminator keys also land here (the curses key value
+   Special terminator keys also land here (the special key value
    will be in arg). */
 void gcmd_grid_accept_line(window_t *win, glui32 arg)
 {
-    int ix;
     void *inbuf;
     int inoriglen, inmax, inunicode;
-    glui32 termkey = 0;
+    glui32 termkey = arg;
     gidispatch_rock_t inarrayrock;
     window_textgrid_t *dwin = win->data;
     tgline_t *ln = &(dwin->lines[dwin->inorgy]);
@@ -560,11 +629,6 @@ void gcmd_grid_accept_line(window_t *win, glui32 arg)
     dwin->cury = dwin->inorgy+1;
     dwin->curx = 0;
     win->styleplus = dwin->origstyleplus;
-
-    if (arg)
-        termkey = gli_input_from_native(arg);
-    else
-        termkey = 0;
 
     gli_event_store(evtype_LineInput, win, dwin->inlen, termkey);
     win->line_request = FALSE;
@@ -596,19 +660,20 @@ void gcmd_grid_insert_key(window_t *win, glui32 arg)
     if (arg > 0xFF)
         return;
     
+    /* N.B. incurs is a buffer offset. */
     for (ix=dwin->inlen; ix>dwin->incurs; ix--) 
-        ln->chars[dwin->inorgx+ix] = ln->chars[dwin->inorgx+ix-1];
-    gli_reset_styleplus(&ln->styleplusses[dwin->inorgx+dwin->inlen], style_Input);
-    ln->chars[dwin->inorgx+dwin->incurs] = arg;
+        ln->chars[lnoffset(ln, dwin->inorgx)+ix] = ln->chars[lnoffset(ln, dwin->inorgx)+ix-1];
+    gli_reset_styleplus(&ln->styleplusses[lnoffset(ln, dwin->inorgx) + dwin->inlen], style_Input);
+    ln->chars[lnoffset(ln, dwin->inorgx) + dwin->incurs] = glui32_to_glichar(arg);
     
-    setposdirty(dwin, ln, dwin->inorgx+dwin->incurs, dwin->inorgy);
+    setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->incurs), dwin->inorgy);
     if (dwin->incurs != dwin->inlen) {
-        setposdirty(dwin, ln, dwin->inorgx+dwin->inlen, dwin->inorgy);
+        setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->inlen), dwin->inorgy);
     }
     
     dwin->incurs++;
     dwin->inlen++;
-    dwin->curx = dwin->inorgx+dwin->incurs;
+    dwin->curx = GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->incurs);
     dwin->cury = dwin->inorgy;
     
     updatetext(dwin, FALSE);
@@ -632,10 +697,10 @@ void gcmd_grid_delete(window_t *win, glui32 arg)
             if (dwin->incurs <= 0)
                 return;
             for (ix=dwin->incurs; ix<dwin->inlen; ix++) 
-                ln->chars[dwin->inorgx+ix-1] = ln->chars[dwin->inorgx+ix];
-            ln->chars[dwin->inorgx+dwin->inlen-1] = ' ';
-            setposdirty(dwin, ln, dwin->inorgx+dwin->incurs-1, dwin->inorgy);
-            setposdirty(dwin, ln, dwin->inorgx+dwin->inlen-1, dwin->inorgy);
+                ln->chars[lnoffset(ln, dwin->inorgx)+ix-1] = ln->chars[lnoffset(ln, dwin->inorgx)+ix];
+            ln->chars[lnoffset(ln, dwin->inorgx)+dwin->inlen-1] = ' ';
+            setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->incurs-1), dwin->inorgy);
+            setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->inlen-1), dwin->inorgy);
             dwin->incurs--;
             dwin->inlen--;
             break;
@@ -643,17 +708,17 @@ void gcmd_grid_delete(window_t *win, glui32 arg)
             if (dwin->incurs >= dwin->inlen)
                 return;
             for (ix=dwin->incurs; ix<dwin->inlen-1; ix++) 
-                ln->chars[dwin->inorgx+ix] = ln->chars[dwin->inorgx+ix+1];
+                ln->chars[lnoffset(ln, dwin->inorgx)+ix] = ln->chars[lnoffset(ln, dwin->inorgx)+ix+1];
             ln->chars[dwin->inorgx+dwin->inlen-1] = ' ';
-            setposdirty(dwin, ln, dwin->inorgx+dwin->incurs, dwin->inorgy);
-            setposdirty(dwin, ln, dwin->inorgx+dwin->inlen-1, dwin->inorgy);
+            setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->incurs), dwin->inorgy);
+            setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->inlen-1), dwin->inorgy);
             dwin->inlen--;
             break;
         case gcmd_KillInput:
             for (ix=0; ix<dwin->inlen; ix++) 
-                ln->chars[dwin->inorgx+ix] = ' ';
+                ln->chars[lnoffset(ln, dwin->inorgx)+ix] = ' ';
             setposdirty(dwin, ln, dwin->inorgx+0, dwin->inorgy);
-            setposdirty(dwin, ln, dwin->inorgx+dwin->inlen-1, dwin->inorgy);
+            setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->inlen-1), dwin->inorgy);
             dwin->inlen = 0;
             dwin->incurs = 0;
             break;
@@ -661,14 +726,14 @@ void gcmd_grid_delete(window_t *win, glui32 arg)
             if (dwin->incurs >= dwin->inlen)
                 return;
             for (ix=dwin->incurs; ix<dwin->inlen; ix++) 
-                ln->chars[dwin->inorgx+ix] = ' ';
-            setposdirty(dwin, ln, dwin->inorgx+dwin->incurs, dwin->inorgy);
-            setposdirty(dwin, ln, dwin->inorgx+dwin->inlen-1, dwin->inorgy);
+                ln->chars[lnoffset(ln, dwin->inorgx)+ix] = ' ';
+            setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->incurs), dwin->inorgy);
+            setposdirty(dwin, ln, GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->inlen-1), dwin->inorgy);
             dwin->inlen = dwin->incurs;
             break;
     }
 
-    dwin->curx = dwin->inorgx+dwin->incurs;
+    dwin->curx = GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->incurs);
     dwin->cury = dwin->inorgy;
     
     updatetext(dwin, FALSE);
@@ -706,7 +771,7 @@ void gcmd_grid_move_cursor(window_t *win, glui32 arg)
             break;
     }
 
-    dwin->curx = dwin->inorgx+dwin->incurs;
+    dwin->curx = GLISTRNWIDTH(ln->chars, lnoffset(ln, dwin->inorgx)+dwin->incurs);
     dwin->cury = dwin->inorgy;
     
 }

@@ -39,12 +39,6 @@ static TAILQ_HEAD(unused2, glk_schannel_event_struct) schannel_events =
 static TAILQ_HEAD(unused3, glk_schannel_struct) schannels =
     TAILQ_HEAD_INITIALIZER(schannels);
 
-/* static functions */
-#if defined(__clang__) || defined(__GNUC__)
-__attribute__((format(printf, 1, 2)))
-#endif
-static void warningf(const char *format, ...);
-
 /* callbacks */
 void gli_finished_callback(int mix_channel);
 Uint32 gli_volume_callback(Uint32 interval, void *param);
@@ -103,7 +97,7 @@ static int load_resource(glui32 snd, Mix_Chunk **pmix_chunk)
         giblorb_result_t res = {0};
         if (giblorb_load_resource(map, giblorb_method_Memory, &res,
                                   giblorb_ID_Snd, snd) != giblorb_err_None) {
-            warningf("sound: unable to load resource %d", snd);
+            gli_msgline_warningf(GLITEXT("sound: unable to load resource %d"), snd);
             return FALSE;
         }
         if (res.length > INT_MAX) {
@@ -159,7 +153,7 @@ static int load_resource(glui32 snd, Mix_Chunk **pmix_chunk)
         free(dir);
         return ret;
     }
-    warningf("sound: unable to load resource %d", snd);
+    gli_msgline_warningf(GLITEXT("sound: unable to load resource %d"), snd);
     return FALSE;
 }
 
@@ -203,7 +197,7 @@ static int play_resource(schannel_t *chan, Mix_Chunk *mix_chunk,
     if (notify) {
         chan->finished_event_data = malloc(sizeof(schannel_event_t));
         if (!chan->finished_event_data) {
-            warningf("sound: unable to allocate memory");
+            gli_msgline_warning(GLITEXT("sound: unable to allocate memory"));
             return FALSE;
         }
         chan->finished_event_data->event.type = evtype_SoundNotify;
@@ -217,7 +211,8 @@ static int play_resource(schannel_t *chan, Mix_Chunk *mix_chunk,
         chan->mix_chunk = mix_chunk;
         chan->mix_channel = Mix_PlayChannel(-1, chan->mix_chunk, repeats - 1);
         if (chan->mix_channel < 0) {
-            warningf("sound: error playing resource: %s", Mix_GetError());
+            /* TODO(townba): Output Mix_GetError(). */
+            gli_msgline_warning(GLITEXT("sound: error playing resource"));
             chan->mix_chunk = NULL;
             break;
         }
@@ -237,7 +232,7 @@ static void set_volume(schanid_t chan, glui32 vol, glui32 duration,
                        glui32 notify)
 {
     if (!chan) {
-        warningf("sound: invalid channel");
+        gli_msgline_warning(GLITEXT("sound: invalid channel"));
         return;
     }
 
@@ -273,40 +268,16 @@ static void set_volume(schanid_t chan, glui32 vol, glui32 duration,
     SDL_UnlockMutex(mutex);
 }
 
-static void warningf(const char *format, ...)
-{
-    va_list args;
-    int n = 0;
-    size_t siz = 256;
-    char *buf = NULL;
-    for (;;) {
-        buf = malloc(siz);
-        if (!buf) {
-            gli_strict_warning((char *)format);
-            return;
-        }
-        va_start(args, format);
-        n = vsnprintf(buf, siz, format, args);
-        va_end(args);
-        if (n < 0 || (size_t)n < siz) {
-            gli_strict_warning(buf);
-            free(buf);
-            return;
-        }
-        siz = (size_t)n + 1;
-        free(buf);
-    }
-}
-
 void gli_initialize_sound(void)
 {
     if (mutex) {
-        warningf("sound: already initialized");
+        gli_msgline_warning(GLITEXT("sound: already initialized"));
         return;
     }
     mutex = SDL_CreateMutex();
     if (!mutex) {
-        warningf("sound: error in SDL_CreateMutex: %s", SDL_GetError());
+        /* TODO(townba): Output SDL_GetError(). */
+        gli_msgline_warning(GLITEXT("sound: error in SDL_CreateMutex"));
         return;
     }
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
@@ -329,7 +300,7 @@ void gli_shutdown_sound(void)
     otherres_t *otherres = NULL;
 
     if (!mutex) {
-        warningf("sound: not initialized");
+        gli_msgline_warning(GLITEXT("sound: not initialized"));
         return;
     }
 
@@ -449,7 +420,7 @@ schanid_t glk_schannel_create(glui32 rock)
 void glk_schannel_destroy(schanid_t chan)
 {
     if (!chan) {
-        warningf("sound: invalid channel");
+        gli_msgline_warning(GLITEXT("sound: invalid channel"));
         return;
     }
 
@@ -492,7 +463,7 @@ schanid_t glk_schannel_iterate(schanid_t chan, glui32 *rockptr)
 glui32 glk_schannel_get_rock(schanid_t chan)
 {
     if (!chan) {
-        warningf("sound: invalid channel");
+        gli_msgline_warning(GLITEXT("sound: invalid channel"));
         return 0;
     }
     return chan->rock;
@@ -509,7 +480,7 @@ glui32 glk_schannel_play_ext(schanid_t chan, glui32 snd, glui32 repeats,
     Mix_Chunk *mix_chunk = NULL;
 
     if (!chan) {
-        warningf("sound: invalid channel");
+        gli_msgline_warning(GLITEXT("sound: invalid channel"));
         return 0;
     }
 
@@ -531,7 +502,7 @@ void glk_schannel_stop(schanid_t chan)
     schannel_event_t *event_data = NULL, *tmp = NULL;
 
     if (!chan) {
-        warningf("sound: invalid channel");
+        gli_msgline_warning(GLITEXT("sound: invalid channel"));
         return;
     }
 
@@ -615,7 +586,7 @@ glui32 glk_schannel_play_multi(schanid_t *chanarray, glui32 chancount,
 void glk_schannel_pause(schanid_t chan)
 {
     if (!chan) {
-        warningf("sound: invalid channel");
+        gli_msgline_warning(GLITEXT("sound: invalid channel"));
         return;
     }
 
@@ -628,7 +599,7 @@ void glk_schannel_pause(schanid_t chan)
 void glk_schannel_unpause(schanid_t chan)
 {
     if (!chan) {
-        warningf("sound: invalid channel");
+        gli_msgline_warning(GLITEXT("sound: invalid channel"));
         return;
     }
 

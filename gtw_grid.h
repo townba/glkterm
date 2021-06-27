@@ -7,7 +7,7 @@
 /* One line of the window. */
 typedef struct tgline_struct {
     int size; /* this is the allocated size; only width is valid */
-    char *chars;
+    glichar *chars;
     styleplus_t *styleplusses;
     int dirtybeg, dirtyend; /* characters [dirtybeg, dirtyend) need to be redrawn */
 } tgline_t;
@@ -40,7 +40,7 @@ extern void win_textgrid_destroy(window_textgrid_t *dwin);
 extern void win_textgrid_rearrange(window_t *win, grect_t *box);
 extern void win_textgrid_redraw(window_t *win);
 extern void win_textgrid_update(window_t *win);
-extern void win_textgrid_putchar(window_t *win, char ch);
+extern void win_textgrid_putchar(window_t *win, glichar ch);
 extern void win_textgrid_clear(window_t *win);
 extern void win_textgrid_move_cursor(window_t *win, int xpos, int ypos);
 extern void win_textgrid_place_cursor(window_t *win, int *xpos, int *ypos);
