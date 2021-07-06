@@ -901,7 +901,7 @@ void gli_windows_redraw()
             ix = 0;
         jx = (content_box.top+content_box.bottom) / 2;
         move(jx, ix);
-        addstr("Please wait...");
+        gli_curses_addstr("Please wait...");
     }
 }
 
@@ -1230,12 +1230,12 @@ void glk_window_move_cursor(window_t *win, glui32 xpos, glui32 ypos)
 void gli_print_spaces(int len)
 {
     while (len >= NUMSPACES) {
-        addstr(spacebuffer);
+        gli_curses_addstr(spacebuffer);
         len -= NUMSPACES;
     }
     
     if (len > 0) {
-        addstr(&(spacebuffer[NUMSPACES - len]));
+        gli_curses_addstr(&(spacebuffer[NUMSPACES - len]));
     }
 }
 

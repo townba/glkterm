@@ -44,12 +44,12 @@ void win_blank_redraw(window_t *win)
     for (jx=win->bbox.top; jx<win->bbox.bottom; jx++) {
         move(jx, win->bbox.left);
         for (ix=win->bbox.left; ix<win->bbox.right; ix++)
-            addch(':');
+            gli_curses_addch(':');
     }
     
-    mvaddch(win->bbox.top, win->bbox.left, '/');
-    mvaddch(win->bbox.top, win->bbox.right-1, '\\');
-    mvaddch(win->bbox.bottom-1, win->bbox.left, '\\');
-    mvaddch(win->bbox.bottom-1, win->bbox.right-1, '/');
+    gli_curses_mvaddch(win->bbox.top, win->bbox.left, '/');
+    gli_curses_mvaddch(win->bbox.top, win->bbox.right-1, '\\');
+    gli_curses_mvaddch(win->bbox.bottom-1, win->bbox.left, '\\');
+    gli_curses_mvaddch(win->bbox.bottom-1, win->bbox.right-1, '/');
 }
 

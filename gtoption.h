@@ -95,7 +95,7 @@
     is unprintable. So are only concerned with the range 0xA0 to 0xFF.
 */
 
-/* #define OPT_NATIVE_LATIN_1 */
+#define OPT_NATIVE_LATIN_1
 
 /* OPT_NATIVE_LATIN_1 should be defined if the character input and
     output on your system uses the Latin-1 character set. In other
@@ -143,6 +143,7 @@
 }
 */
 
+/*
 #define OPT_AO_FF_OUTPUT {  \
     '\312', '\301', '\242', '\243',  0    , '\264',  0    , '\244',  \
     '\254', '\251', '\273', '\307', '\302', '\320', '\250',  0    ,  \
@@ -157,6 +158,7 @@
      0    , '\226', '\230', '\227', '\231', '\233', '\232', '\326',  \
     '\277', '\235', '\234', '\236', '\237',  0    ,  0    , '\330',  \
 }
+*/
 
 /* OPT_AO_FF_OUTPUT should be defined as a translation table. This is
     ignored if OPT_NATIVE_LATIN_1 is defined. 

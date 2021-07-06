@@ -332,6 +332,10 @@ extern fileref_t *gli_new_fileref(char *filename, glui32 usage,
     glui32 rock);
 extern void gli_delete_fileref(fileref_t *fref);
 
+extern int gli_curses_addch(const unsigned ch);
+extern int gli_curses_addstr(const char *str);
+extern int gli_curses_mvaddch(int y, int x, const unsigned ch);
+
 /* A macro that I can't think of anywhere else to put it. */
 
 #define gli_event_clearevent(evp)  \

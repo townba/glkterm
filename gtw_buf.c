@@ -614,7 +614,7 @@ static void updatetext(window_textbuffer_t *dwin)
                             style bits. */
                         gli_set_window_style(dwin->owner, &wd->styleplus);
                         for (ix=0; ix<wd->len; ix++, cx++, count++)
-                            addch(*cx);
+                            gli_curses_addch(*cx);
                     }
                 }
                 gli_set_window_style(dwin->owner, NULL);

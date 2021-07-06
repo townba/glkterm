@@ -6,6 +6,7 @@
 */
 
 #include "gtoption.h"
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,6 +50,8 @@ int main(int argc, char *argv[])
 {
     int ix, jx, val;
     glkunix_startup_t startdata;
+    
+    setlocale(LC_ALL, "");
     
     /* Test for compile-time errors. If one of these spouts off, you
         must edit glk.h and recompile. */
