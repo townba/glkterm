@@ -187,13 +187,13 @@ void win_pair_redraw(window_t *win)
     if (dwin->vertical) {
         if (dwin->splitwidth) {
             for (ix=win->bbox.top; ix<win->bbox.bottom; ix++) {
-                gli_curses_mvaddch(ix, dwin->splitpos, '|');
+                gli_curses_mvaddch_uni(ix, dwin->splitpos, '|');
             }
             if (win->bbox.top-1 >= 0) {
-                gli_curses_mvaddch(win->bbox.top-1, dwin->splitpos, '+');
+                gli_curses_mvaddch_uni(win->bbox.top-1, dwin->splitpos, '+');
             }
             if (win->bbox.bottom < content_box.bottom) {
-                gli_curses_mvaddch(win->bbox.bottom, dwin->splitpos, '+');
+                gli_curses_mvaddch_uni(win->bbox.bottom, dwin->splitpos, '+');
             }
         }
     }
@@ -201,13 +201,13 @@ void win_pair_redraw(window_t *win)
         if (dwin->splitwidth) {
             move(dwin->splitpos, win->bbox.left);
             for (ix=win->bbox.left; ix<win->bbox.right; ix++) {
-                gli_curses_addch('-');
+                gli_curses_addch_uni('-');
             }
             if (win->bbox.left-1 >= 0) {
-                gli_curses_mvaddch(dwin->splitpos, win->bbox.left-1, '+');
+                gli_curses_mvaddch_uni(dwin->splitpos, win->bbox.left-1, '+');
             }
             if (win->bbox.right < content_box.right) {
-                gli_curses_mvaddch(dwin->splitpos, win->bbox.right, '+');
+                gli_curses_mvaddch_uni(dwin->splitpos, win->bbox.right, '+');
             }
         }
     }

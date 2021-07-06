@@ -237,7 +237,7 @@ static void updatetext(window_textgrid_t *dwin, int drawall)
             ucx = (unsigned char *)ln->chars; /* unsigned, so that addch() doesn't
                 get fed any high style bits. */
             for (iix=beg; iix<ix; iix++) {
-                gli_curses_addch(ucx[iix]);
+                gli_curses_addch_uni(ucx[iix]);
             }
         }
         

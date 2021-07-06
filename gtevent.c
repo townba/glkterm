@@ -71,7 +71,7 @@ void glk_select(event_t *event)
     gli_input_guess_focus();
     
     while (TAILQ_EMPTY(&events)) {
-        int key;
+        glui32 key;
     
         /* It would be nice to display a "hit any key to continue" message in
             all windows which require it. */
@@ -80,7 +80,7 @@ void glk_select(event_t *event)
             refresh();
             needrefresh = FALSE;
         }
-        key = getch();
+        key = gli_curses_getch_uni();
         
 #ifdef OPT_USE_SIGNALS
         if (just_killed) {

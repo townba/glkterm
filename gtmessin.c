@@ -42,7 +42,7 @@ static void update_text(inline_t *lin);
 int gli_msgin_getchar(char *prompt, int hilite)
 {
     int orgx, orgy;
-    int key;
+    glui32 key;
 
     gli_windows_update();
     gli_windows_set_paging(TRUE);
@@ -77,7 +77,7 @@ int gli_msgin_getchar(char *prompt, int hilite)
 
     key = ERR;
     while (key == ERR) {
-        key = getch();
+        key = gli_curses_getch_uni();
     }
     
     if (pref_messageline) {
@@ -135,7 +135,7 @@ int gli_msgin_getline(char *prompt, char *buf, int maxlen, int *length)
     needrefresh = TRUE;
     
     while (!lin->done) {
-        int key;
+        glui32 key;
         
         move(lin->orgy, lin->orgx + lin->curs);
         if (needrefresh) {
@@ -143,7 +143,7 @@ int gli_msgin_getline(char *prompt, char *buf, int maxlen, int *length)
             needrefresh = FALSE;
         }
 
-        key = getch();
+        key = gli_curses_getch_uni();
         
         if (key != ERR) {
             handle_key(lin, key);
@@ -173,7 +173,7 @@ static void update_text(inline_t *lin)
     
     move(lin->orgy, lin->orgx);
     for (ix=0; ix<lin->len; ix++) {
-        gli_curses_addch(lin->buf[ix]);
+        gli_curses_addch_uni(lin->buf[ix]);
     }
     clrtoeol();
 }

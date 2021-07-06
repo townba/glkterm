@@ -80,15 +80,15 @@ void gli_msgline_redraw()
         int ix, len;
         
         move(content_box.bottom, 0);
-        gli_curses_addch(' ');
-        gli_curses_addch(' ');
+        gli_curses_addch_uni(' ');
+        gli_curses_addch_uni(' ');
         attron(A_REVERSE);
         if (msgbuflen > content_box.right-3)
             len = content_box.right-3;
         else
             len = msgbuflen;
         for (ix=0; ix<len; ix++) {
-            gli_curses_addch(msgbuf[ix]);
+            gli_curses_addch_uni(msgbuf[ix]);
         }
         attrset(0);
         clrtoeol();
