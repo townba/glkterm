@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#define _XOPEN_SOURCE_EXTENDED /* ncursesw *wch* and *wstr* functions */
 #include <curses.h>
 #include "glk.h"
 #include "glkterm.h"
@@ -301,3 +302,37 @@ void *memmove(void *destp, void *srcp, int n)
 }
 
 #endif /* NO_MEMMOVE */
+
+#define REPLACEMENT_CHAR ((wchar_t)0xFFFD)
+
+int gli_curses_addch_uni(glui32 ch)
+{
+    if (ch > WCHAR_MAX) ch = REPLACEMENT_CHAR;
+    wchar_t wch = ch;
+    return addnwstr(&wch, 1);
+}
+
+glui32 gli_curses_getch_uni()
+{
+    /* TODO(townba): Allow for overlap with Unicode and key codes. */
+    wint_t wint;
+    switch (get_wch(&wint)) {
+    case KEY_CODE_YES:
+        return wint;
+    case OK:
+        if (wint < KEY_MIN || wint > KEY_MAX) {
+            return wint;
+        }
+        /* Fall through */
+    case ERR:
+    default:
+        return (glui32)(-1);
+    }
+}
+
+int gli_curses_mvaddch_uni(int y, int x, glui32 ch)
+{
+    if (ch > WCHAR_MAX) ch = REPLACEMENT_CHAR;
+    wchar_t wch = ch;
+    return mvaddnwstr(y, x, &wch, 1);
+}

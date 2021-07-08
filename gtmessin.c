@@ -68,7 +68,7 @@ int gli_msgin_getchar(char *prompt, int hilite)
     move(orgy, LEFT_MARGIN);
     if (hilite)
         attron(A_REVERSE);
-    gli_curses_addstr(prompt);
+    addstr(prompt);
     if (hilite)
         attrset(0);
 
@@ -129,7 +129,7 @@ int gli_msgin_getline(char *prompt, char *buf, int maxlen, int *length)
     }
     
     move(lin->orgy, LEFT_MARGIN);
-    gli_curses_addstr(lin->prompt);
+    addstr(lin->prompt);
     update_text(lin);
     
     needrefresh = TRUE;

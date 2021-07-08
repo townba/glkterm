@@ -333,7 +333,6 @@ extern fileref_t *gli_new_fileref(char *filename, glui32 usage,
 extern void gli_delete_fileref(fileref_t *fref);
 
 extern int gli_curses_addch_uni(glui32 ch);
-extern int gli_curses_addstr(const char *str);
 extern glui32 gli_curses_getch_uni();
 extern int gli_curses_mvaddch_uni(int y, int x, glui32 ch);
 
